@@ -1,8 +1,9 @@
 $(document).ready(function() {
-    let parsedData = null;
+let parsedData = null;
     let isChartVisible = false;
     let pivotConfig = null;
     let isDataLoaded = false;
+    let aData = []
 
     // Set up IntersectionObserver for applying animation
     const observerOptions = {
@@ -124,6 +125,17 @@ $(document).ready(function() {
                 ),
                 hiddenAttributes: ['$$hashKey'],
                 menuLimit: 500000,
+                rendererOptions: {
+                    table: {
+                        clickCallback: function(e, value, filters, pivotData) {
+                            aData = [];
+                            pivotData.forEachMatchingRecord(filters, function(record) {
+                                aData.push({ ...record });
+                            });
+                            showToast(`Selected ${aData.length} records for export`, 'info');
+                        }
+                    }
+                },
                 onRefresh: function(config) {
                     pivotConfig = config;
                     $('.pvtTable').addClass('table table-striped table-bordered table-hover');
@@ -260,6 +272,45 @@ $(document).ready(function() {
         }, 100);
     });
 
+    $('#exportRawXlsx').on('click', function() {
+        $('#fullPageLoader').css('display', 'flex');
+        setTimeout(() => {
+            if (aData.length === 0) {
+                showToast('No data selected. Please click on a pivot table cell first.', 'warning');
+                $('#fullPageLoader').css('display', 'none');
+                return;
+            }
+
+            try {
+                const headers = Object.keys(aData[0]);
+                const rows = aData.map(row => {
+                    const rowData = {};
+                    headers.forEach(header => {
+                        rowData[header] = row[header] || '';
+                    });
+                    return rowData;
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(rows);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'SelectedData');
+                XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
+
+                const colWidths = headers.map(header => ({
+                    wch: Math.max(header.length, ...rows.map(row => String(row[header] || '').length)) + 2
+                }));
+                worksheet['!cols'] = colWidths;
+
+                XLSX.writeFile(workbook, 'selected_raw_data.xlsx');
+                showToast('Selected raw data exported to Excel successfully!', 'success');
+            } catch (err) {
+                showToast('Error exporting to XLSX: ' + err.message, 'error');
+            }
+
+            $('#fullPageLoader').css('display', 'none');
+        }, 100);
+    });
+
     $('#exportCsv').on('click', function () {
         $('#fullPageLoader').css('display', 'flex');
         setTimeout(() => {
@@ -326,51 +377,36 @@ $(document).ready(function() {
     $('#exportXlsx').on('click', function() {
         $('#fullPageLoader').css('display', 'flex');
         setTimeout(() => {
-            const $container = isChartVisible ? $('#chart-output') : $('#output');
-            const $table = $container.find('.pvtTable');
-            if (!$table.length) {
-                showToast('No table found to export. Please ensure Table renderer is selected.', 'warning');
+            if (aData.length === 0) {
+                showToast('No data selected. Please click on a pivot table cell first.', 'warning');
                 $('#fullPageLoader').css('display', 'none');
                 return;
             }
 
             try {
-                const wb = XLSX.utils.book_new();
-                const ws = XLSX.utils.table_to_sheet($table[0], { raw: true });
-                
-                const merges = [];
-                $table.find('tr').each((r, row) => {
-                    $(row).find('th, td').each((c, cell) => {
-                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1');
-                        const colspan = parseInt(cell.getAttribute('colspan') || '1');
-                        if (rowspan > 1 || colspan > 1) {
-                            merges.push({
-                                s: { r, c },
-                                e: { r: r + rowspan - 1, c: c + colspan - 1 }
-                            });
-                        }
+
+                const headers = Object.keys(aData[0]);
+
+                const rows = aData.map(row => {
+                    const rowData = {};
+                    headers.forEach(header => {
+                        rowData[header] = row[header] || '';
                     });
+                    return rowData;
                 });
-                ws['!merges'] = merges;
 
-                const range = XLSX.utils.decode_range(ws['!ref']);
-                const colWidths = [];
-                for (let C = range.s.c; C <= range.e.c; ++C) {
-                    let maxWidth = 10;
-                    for (let R = range.s.r; R <= range.e.r; ++R) {
-                        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
-                        if (cell && cell.v) {
-                            const len = cell.v.toString().length;
-                            if (len > maxWidth) maxWidth = len;
-                        }
-                    }
-                    colWidths.push({ wch: maxWidth + 2 });
-                }
-                ws['!cols'] = colWidths;
+                const worksheet = XLSX.utils.json_to_sheet(rows);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'SelectedData');
+                XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
 
-                XLSX.utils.book_append_sheet(wb, ws, 'Pivot Table');
-                XLSX.writeFile(wb, 'pivot_export.xlsx');
-                showToast('Pivot table exported to Excel successfully!', 'success');
+                const colWidths = headers.map(header => ({
+                    wch: Math.max(header.length, ...rows.map(row => String(row[header] || '').length)) + 2
+                }));
+                worksheet['!cols'] = colWidths;
+
+                XLSX.writeFile(workbook, 'selected_pivot_data.xlsx');
+                showToast('Selected data exported to Excel successfully!', 'success');
             } catch (err) {
                 showToast('Error exporting to XLSX: ' + err.message, 'error');
             }
