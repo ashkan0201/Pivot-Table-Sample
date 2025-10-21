@@ -15,12 +15,26 @@ function generateUUID() {
 $(document).ready(function() {
     // Application state variables
     let parsedData = null; // Parsed data from uploaded file
-    let isChartVisible = false; // Tracks whether chart or table view is active
     let pivotConfig = null; // Configuration for pivot table/chart
     let isDataLoaded = false; // Indicates if data is loaded
     let aData = []; // Stores selected data for export
     let currentFileName = ''; // Name of the current file
     let hasUnsavedChanges = false; // Tracks unsaved changes
+
+    // Function to save pivotConfig to localStorage
+    function saveConfig() {
+        if (pivotConfig) {
+            localStorage.setItem('pivotConfig', JSON.stringify(pivotConfig));
+        }
+    }
+
+    // Function to load pivotConfig from localStorage
+    function loadConfig() {
+        const stored = localStorage.getItem('pivotConfig');
+        if (stored) {
+            pivotConfig = JSON.parse(stored);
+        }
+    }
 
     // Intersection observer for lazy loading large datasets
     const observerOptions = {
@@ -31,7 +45,6 @@ $(document).ready(function() {
 
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            // Add visibility class when element is in view and data is loaded
             if (entry.isIntersecting && isDataLoaded && parsedData && parsedData.length > 1000) {
                 entry.target.classList.add('is-visible');
                 observer.unobserve(entry.target);
@@ -41,7 +54,6 @@ $(document).ready(function() {
 
     // Observe output and chart-output elements
     observer.observe(document.getElementById('output'));
-    observer.observe(document.getElementById('chart-output'));
 
     // Toggles unsaved changes alert visibility
     function setUnsavedChanges(changed) {
@@ -81,7 +93,6 @@ $(document).ready(function() {
             showToast(`Switched to ${theme} mode`, 'success');
             if (isDataLoaded && parsedData) {
                 renderPivotTable();
-                renderPivotChart();
             }
             $('#fullPageLoader').css('display', 'none');
         }, 500);
@@ -103,8 +114,17 @@ $(document).ready(function() {
             showToast('Please select a valid CSV file.', 'error');
             return;
         }
+
+        // Clear both localStorage and sessionStorage before processing the file
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Explicitly reset pivotConfig to ensure no previous config is used
+        pivotConfig = null;
+
         // Reset state
         parsedData = null;
+        aData = []; // Reset selected data
         isDataLoaded = false;
         currentFileName = file.name;
         $('#fileName').text(currentFileName);
@@ -115,51 +135,49 @@ $(document).ready(function() {
                 <p>Please upload a CSV file to start analyzing your data.</p>
             </div>
         `);
-        $('#chart-output').empty().addClass('d-none');
-        $('#exportButtons, #toggleChart').addClass('d-none');
+        $('#exportButtons').addClass('d-none');
         $('#fullPageLoader').css('display', 'flex');
 
-        setUnsavedChanges(true);
+        setUnsavedChanges(false); // Fresh upload has no unsaved changes initially
 
-            // Handle CSV file
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                dynamicTyping: true,
-                worker: true,
-                complete: function(results) {
-                    $('#fullPageLoader').css('display', 'none');
-                    if (results.errors.length > 0) {
-                        showToast('CSV parsing errors: ' + results.errors.map(err => {
-                            if (err.type === 'Quotes') return 'Invalid quotes in CSV.';
-                            if (err.type === 'Delimiter') return 'Invalid delimiter detected.';
-                            return err.message;
-                        }).join(', '), 'error');
-                        return;
-                    }
-                    if (!results.data || results.data.length === 0) {
-                        showToast('No data found in CSV.', 'error');
-                        return;
-                    }
-                    if (results.data.length > 500000) {
-                        showToast('CSV exceeds 500,000 rows. Please upload a smaller file or use server-side processing.', 'error');
-                        return;
-                    }
-                    parsedData = results.data;
-                    isDataLoaded = true;
-                    isChartVisible = false; // Default to table view
-                    pivotConfig = { rows: [], cols: [], vals: [], aggregatorName: 'Count', rendererName: 'Table' };
-                    renderPivotTable();
-                    $('#exportButtons, #toggleChart').removeClass('d-none');
-                    $('#toggleChart').html('<i class="fas fa-chart-bar me-2"></i>Show Chart View');
-                    showToast('File loaded successfully!', 'success');
-                },
-                error: function(error) {
-                    $('#fullPageLoader').css('display', 'none');
-                    showToast('Error parsing CSV: ' + error.message, 'error');
+        // Handle CSV file
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            dynamicTyping: true,
+            worker: true,
+            complete: function(results) {
+                $('#fullPageLoader').css('display', 'none');
+                if (results.errors.length > 0) {
+                    showToast('CSV parsing errors: ' + results.errors.map(err => {
+                        if (err.type === 'Quotes') return 'Invalid quotes in CSV.';
+                        if (err.type === 'Delimiter') return 'Invalid delimiter detected.';
+                        return err.message;
+                    }).join(', '), 'error');
+                    return;
                 }
-            });
-        $(this).val('');
+                if (!results.data || results.data.length === 0) {
+                    showToast('No data found in CSV.', 'error');
+                    return;
+                }
+                if (results.data.length > 500000) {
+                    showToast('CSV exceeds 500,000 rows. Please upload a smaller file or use server-side processing.', 'error');
+                    return;
+                }
+                parsedData = results.data;
+                isDataLoaded = true;
+                pivotConfig = { rows: [], cols: [], vals: [], aggregatorName: 'Count', rendererName: 'Table' };
+                saveConfig(); // Save initial config
+                renderPivotTable();
+                $('#exportButtons').removeClass('d-none');
+                showToast('File loaded successfully!', 'success');
+            },
+            error: function(error) {
+                $('#fullPageLoader').css('display', 'none');
+                showToast('Error parsing CSV: ' + error.message, 'error');
+            }
+        });
+        $(this).val(''); // Clear file input to allow re-upload
     });
 
     // Save current state to a user-selected file location
@@ -176,14 +194,15 @@ $(document).ready(function() {
                 rendererName: pivotConfig?.rendererName || 'Table',
                 rowOrder: pivotConfig?.rowOrder || 'value_z_to_a',
                 colOrder: pivotConfig?.colOrder || 'value_z_to_a',
-                hiddenAttributes: pivotConfig?.hiddenAttributes || ['$$hashKey']
+                hiddenAttributes: pivotConfig?.hiddenAttributes || ['$$hashKey'],
+                inclusions: pivotConfig?.inclusions || {},
+                exclusions: pivotConfig?.exclusions || {}
             };
             const state = {
                 pivotConfig: cleanPivotConfig,
                 aData: aData,
                 parsedData: parsedData,
-                currentFileName: currentFileName,
-                isChartVisible: isChartVisible
+                currentFileName: currentFileName
             };
             const stateEntry = { id, timestamp, state, signature: "pivot_table_state_v1" };
             const jsonContent = JSON.stringify(stateEntry);
@@ -210,6 +229,13 @@ $(document).ready(function() {
 
     // Button to load states from a selected folder
     $('#loadState').on('click', async function() {
+        // Clear both localStorage and sessionStorage before loading state
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Explicitly reset pivotConfig to ensure no previous config is used
+        pivotConfig = null;
+
         try {
             const dir = await window.showDirectoryPicker();
             const savedStates = [];
@@ -302,8 +328,8 @@ $(document).ready(function() {
             aData = state.aData || [];
             parsedData = state.parsedData;
             currentFileName = state.currentFileName || '';
-            isChartVisible = state.isChartVisible || false;
             isDataLoaded = parsedData && parsedData.length > 0;
+            saveConfig(); // Save loaded config to localStorage
 
             if (currentFileName) {
                 $('#fileName').text(currentFileName);
@@ -313,18 +339,9 @@ $(document).ready(function() {
             }
 
             if (isDataLoaded) {
-                $('#exportButtons, #toggleChart').removeClass('d-none');
-                if (isChartVisible) {
-                    $('#output').addClass('d-none');
-                    $('#chart-output').removeClass('d-none');
-                    $('#toggleChart').html('<i class="fas fa-table me-2"></i>Show Table View');
-                    renderPivotChart();
-                } else {
-                    $('#output').removeClass('d-none');
-                    $('#chart-output').addClass('d-none');
-                    $('#toggleChart').html('<i class="fas fa-chart-bar me-2"></i>Show Chart View');
-                    renderPivotTable();
-                }
+                $('#exportButtons').removeClass('d-none');
+                $('#output').removeClass('d-none');
+                renderPivotTable();
                 setUnsavedChanges(false);
                 showToast('State loaded successfully!', 'success');
             } else {
@@ -334,8 +351,7 @@ $(document).ready(function() {
                         <p>Please upload a CSV file to start analyzing your data.</p>
                     </div>
                 `);
-                $('#chart-output').empty().addClass('d-none');
-                $('#exportButtons, #toggleChart').addClass('d-none');
+                $('#exportButtons').addClass('d-none');
                 showToast('No data in saved state. Please upload a CSV file.', 'warning');
             }
         } catch (err) {
@@ -346,6 +362,7 @@ $(document).ready(function() {
 
     // Renders the pivot table
     function renderPivotTable() {
+        loadConfig(); // Load config from localStorage before rendering
         $('#fullPageLoader').css('display', 'flex');
         if (!parsedData || parsedData.length === 0) {
             $('#fullPageLoader').css('display', 'none');
@@ -365,6 +382,8 @@ $(document).ready(function() {
             vals: pivotConfig.vals || [],
             aggregatorName: pivotConfig.aggregatorName || 'Count',
             rendererName: 'Table',
+            inclusions: pivotConfig.inclusions || {},
+            exclusions: pivotConfig.exclusions || {},
             renderers: $.extend(
                 $.pivotUtilities.renderers,
                 $.pivotUtilities.gchart_renderers,
@@ -387,7 +406,8 @@ $(document).ready(function() {
                 }
             },
             onRefresh: function(config) {
-                pivotConfig = { ...config, rendererName: 'Table' };
+                pivotConfig = { ...config };
+                saveConfig(); // Save updated config to localStorage
                 setUnsavedChanges(true);
                 $('.pvtTable').addClass('table table-striped table-bordered table-hover');
                 $('.pvtTable').css({
@@ -494,7 +514,7 @@ $(document).ready(function() {
                 console.log('Draggable elements:', $('.pvtAttr').length);
                 console.log('Droppable elements:', $('.pvtRows, .pvtCols, .pvtUnused').length);
             }
-        });
+        }, true); // Force overwrite to reset previous state
     }
 
     // Updates pivot configuration when headers are dragged
@@ -516,187 +536,11 @@ $(document).ready(function() {
             // Attribute is only removed from rows and cols
         }
         // Preserve rendererName based on current view (chart or table)
-        pivotConfig.rendererName = isChartVisible ? (pivotConfig.rendererName || 'Horizontal Stacked Bar Chart') : 'Table';
+        pivotConfig.rendererName = 'Table';
+        saveConfig(); // Save updated config
         setUnsavedChanges(true);
         console.log('Updated pivotConfig:', pivotConfig);
     }
-
-    // Renders the pivot chart
-    function renderPivotChart() {
-        $('#fullPageLoader').css('display', 'flex');
-        if (!parsedData || parsedData.length === 0) {
-            showToast('No data available to display chart!', 'error');
-            $('#fullPageLoader').css('display', 'none');
-            return;
-        }
-        $('#chart-output').empty();
-        if (!pivotConfig) {
-            pivotConfig = { rows: ['Province'], cols: ['Party'], vals: [], aggregatorName: 'Count', rendererName: 'Horizontal Stacked Bar Chart' };
-        }
-        pivotConfig.rendererName = pivotConfig.rendererName || 'Horizontal Stacked Bar Chart';
-        const derivers = $.pivotUtilities.derivers;
-        const renderers = $.extend(
-            $.pivotUtilities.renderers,
-            $.pivotUtilities.c3_renderers,
-            $.pivotUtilities.plotly_renderers
-        );
-        // Initialize pivotUI for chart rendering
-        $('#chart-output').pivotUI(parsedData, {
-            renderers: renderers,
-            cols: pivotConfig.cols || ['Party'],
-            rows: pivotConfig.rows || ['Province'],
-            aggregatorName: pivotConfig.aggregatorName || 'Count',
-            rendererName: pivotConfig.rendererName || 'Horizontal Stacked Bar Chart',
-            rowOrder: pivotConfig.rowOrder || 'value_z_to_a',
-            colOrder: pivotConfig.colOrder || 'value_z_to_a',
-            rendererOptions: {
-                c3: {
-                    data: {
-                        colors: {
-                            Liberal: '#dc3912',
-                            Conservative: '#3366cc',
-                            NDP: '#ff9900',
-                            Green: '#109618',
-                            'Bloc Quebecois': '#990099'
-                        }
-                    }
-                }
-            },
-            onRefresh: function(config) {
-                pivotConfig = { ...config, rendererName: pivotConfig.rendererName || 'Horizontal Stacked Bar Chart' };
-                setUnsavedChanges(true);
-                $('.pvtRendererArea').css({
-                    'max-width': '100%',
-                    'overflow-x': 'auto',
-                    'overflow-y': 'auto',
-                    'max-height': '650px'
-                });
-
-                // Clear previous drag-and-drop events
-                $('.pvtAttr, .pvtRows, .pvtCols, .pvtUnused').each(function() {
-                    $(this).removeData('ui-draggable')
-                        .removeData('ui-droppable')
-                        .removeClass('ui-draggable ui-draggable-dragging ui-droppable ui-droppable-hover ui-droppable-active')
-                        .off('.draggable')
-                        .off('.droppable')
-                        .off('click mousedown touchstart');
-                });
-
-                // Apply drag-and-drop functionality for chart
-                function applyDragAndDrop() {
-                    $('.pvtAttr').each(function() {
-                        if (!$(this).hasClass('ui-draggable')) {
-                            $(this).draggable({
-                                helper: 'clone',
-                                appendTo: 'body',
-                                containment: 'window',
-                                zIndex: 1000,
-                                revert: 'invalid',
-                                cursor: 'move',
-                                start: function(event, ui) {
-                                    $(ui.helper).addClass('ui-draggable-dragging').css({
-                                        'padding': '8px 12px',
-                                        'border-radius': '4px',
-                                        'background': '#fff',
-                                        'border': '1px solid #007bff',
-                                        'color': '#333'
-                                    });
-                                    console.log('Dragging started (chart):', $(this).text());
-                                },
-                                stop: function(event, ui) {
-                                    $(ui.helper).removeClass('ui-draggable-dragging');
-                                }
-                            });
-                            $(this).on('mousedown touchstart', function(e) {
-                                e.stopPropagation();
-                                console.log('Mouse down on (chart):', $(this).text());
-                            });
-                        }
-                    });
-
-                    $('.pvtRows, .pvtCols, .pvtUnused').each(function() {
-                        if (!$(this).hasClass('ui-droppable')) {
-                            $(this).droppable({
-                                accept: '.pvtAttr',
-                                hoverClass: 'ui-droppable-active',
-                                activeClass: 'ui-droppable-active',
-                                tolerance: 'intersect',
-                                drop: function(event, ui) {
-                                    $('#fullPageLoader').css('display', 'flex');
-                                    const attr = ui.draggable.text().trim().replace(' ▾', '');
-                                    const target = $(this).hasClass('pvtRows') ? 'rows' :
-                                                $(this).hasClass('pvtCols') ? 'cols' : 'unused';
-                                    console.log('Dropped (chart):', { attr, target });
-                                    updatePivotConfig(attr, target);
-                                    // Re-render chart with updated config
-                                    $('#chart-output').empty().pivotUI(parsedData, {
-                                        ...pivotConfig,
-                                        rendererName: pivotConfig.rendererName || 'Horizontal Stacked Bar Chart'
-                                    }, true);
-                                    setTimeout(() => {
-                                        $('.pvtRendererArea').css({
-                                            'max-width': '100%',
-                                            'overflow-x': 'auto',
-                                            'overflow-y': 'auto',
-                                            'max-height': '650px'
-                                        });
-                                        applyDragAndDrop();
-                                        $('#fullPageLoader').css('display', 'none');
-                                        console.log('Chart rendered:', $('#chart-output .pvtRendererArea').length);
-                                        console.log('Draggable elements (chart):', $('.pvtAttr').length);
-                                        console.log('Droppable elements (chart):', $('.pvtRows, .pvtCols, .pvtUnused').length);
-                                    }, 0);
-                                }
-                            });
-                        }
-                    });
-                }
-
-                applyDragAndDrop();
-                $('#fullPageLoader').css('display', 'none');
-                console.log('Chart rendered:', $('#chart-output .pvtRendererArea').length);
-                console.log('Draggable elements (chart):', $('.pvtAttr').length);
-                console.log('Droppable elements (chart):', $('.pvtRows, .pvtCols, .pvtUnused').length);
-            }
-        });
-    }
-
-    // Toggle between table and chart views
-    $('#toggleChart').on('click', function() {
-        $('#fullPageLoader').css('display', 'flex');
-        setTimeout(() => {
-            isChartVisible = !isChartVisible;
-            setUnsavedChanges(true);
-            if (isChartVisible) {
-                $('#output').addClass('d-none').empty();
-                $('#chart-output').removeClass('d-none');
-                $(this).html('<i class="fas fa-table me-2"></i>Show Table View');
-                pivotConfig.rendererName = 'Horizontal Stacked Bar Chart';
-                renderPivotChart();
-                setTimeout(() => {
-                    const $renderer = $('#chart-output .pvtRenderer');
-                    if ($renderer.length) {
-                        $renderer.val(pivotConfig.rendererName || 'Horizontal Stacked Bar Chart').trigger('change');
-                    }
-                    showToast('Switched to Chart View', 'info');
-                }, 150);
-            } else {
-                $('#chart-output').addClass('d-none').empty();
-                $('#output').removeClass('d-none');
-                $(this).html('<i class="fas fa-chart-bar me-2"></i>Show Chart View');
-                pivotConfig.rendererName = 'Table';
-                renderPivotTable();
-                setTimeout(() => {
-                    const $renderer = $('#output .pvtRenderer');
-                    if ($renderer.length) {
-                        $renderer.val('Table').trigger('change');
-                    }
-                    showToast('Switched to Table View', 'info');
-                }, 150);
-            }
-            $('#fullPageLoader').css('display', 'none');
-        }, 100);
-    });
 
     // Export pivot table to CSV
     $('#exportCsv').on('click', function() {
@@ -766,7 +610,7 @@ $(document).ready(function() {
     $('#exportXlsx').on('click', function() {
         $('#fullPageLoader').css('display', 'flex');
         setTimeout(() => {
-            const $container = isChartVisible ? $('#chart-output') : $('#output');
+            const $container = $('#output');
             const $table = $container.find('.pvtTable');
             if (!$table.length) {
                 showToast('No table found to export. Please ensure Table renderer is selected.', 'warning');
@@ -860,7 +704,7 @@ $(document).ready(function() {
 
     // Extracts table data for export
     function extractTableData() {
-        const $container = isChartVisible ? $('#chart-output') : $('#output');
+        const $container = $('#output');
         const $table = $container.find('.pvtTable');
         if (!$table.length) {
             showToast('No table found to export. Please ensure Table renderer is selected.', 'warning');

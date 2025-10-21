@@ -12,7 +12,10 @@ table.pvtTable tbody tr td{color:#3D3D3D;padding:5px;background-color:#FFF;borde
 .pvtAxisContainer li.pvtPlaceholder{-webkit-border-radius:5px;padding:3px 15px;-moz-border-radius:5px;border-radius:5px;border:1px dashed #aaa}
 .pvtAxisContainer li span.pvtAttr{-webkit-text-size-adjust:100%;background:#F3F3F3;border:1px solid #DEDEDE;padding:2px 5px;white-space:nowrap;-webkit-border-radius:5px;-moz-border-radius:5px;border-radius:5px}
 .pvtTriangle{cursor:pointer;color:grey}
-.pvtHorizList li{display:inline}
+.pvtHorizList li {
+    display: inline;
+    padding: 10px;
+}
 .pvtVertList{vertical-align:top}
 .pvtFilteredAttribute{font-style:italic}
 .pvtFilterBox{z-index:100;width:300px;border:1px solid rgb(33, 94, 172);background-color:#a072f6;position:absolute;text-align:center}
