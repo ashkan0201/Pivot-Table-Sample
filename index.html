@@ -46,11 +46,12 @@
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/css2.css">
     <link rel="stylesheet" href="css/jquery-ui.css">
-    <link rel="stylesheet" type="text/css" href="./css/pivot.min.css">
-    <link rel="stylesheet" href="./css/all.min.css">
-    <link rel="stylesheet" href="./css/animate.min.css"/>
-    <link rel="stylesheet" href="./css/c3.min.css">
-    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" type="text/css" href="css/pivot.min.css">
+    <link rel="stylesheet" href="css/all.min.css">
+    <link rel="stylesheet" href="css/animate.min.css"/>
+    <link rel="stylesheet" href="css/c3.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body data-bs-theme="light">
     <div class="full-page-loader" id="fullPageLoader">
@@ -65,26 +66,40 @@
             <label class="form-check-label" for="themeToggle"><i class="fas fa-moon me-2"></i>Dark Mode</label>
         </div>
         
+        <div class="load-state-section mb-3 text-center animate__animated animate__fadeIn animate__delay-2s">
+            <button class="btn btn-secondary btn-modern" type="button" id="loadState">
+                <i class="fas fa-upload me-2"></i>Load Saved State
+            </button>
+        </div>
+        
         <div class="upload-section animate__animated animate__zoomIn animate__delay-3s">
             <h4 class="mb-3"><i class="fas fa-cloud-upload-alt me-2"></i>Upload Your CSV File</h4>
             <p class="text-muted mb-3">Supports large files with background processing</p>
-            <div class="input-group">
+            <div class="input-group mb-2">
                 <span class="input-group-text"><i class="fas fa-file-csv"></i></span>
                 <input type="file" class="form-control" id="fileInput" accept=".csv">
                 <button class="btn btn-primary btn-upload" type="button" id="uploadBtn">Upload</button>
             </div>
+            <div id="fileNameDisplay" class="text-center text-muted mb-3 animate__animated animate__fadeIn d-none">
+                <i class="fas fa-file-csv me-2"></i><span id="fileName"></span>
+            </div>
+        </div>
+        
+        <div id="unsavedChangesAlert" class="text-center mb-2 d-none">
+            <span class="text-warning animate__animated animate__pulse"><i class="fas fa-exclamation-circle me-2"></i>Unsaved Changes</span>
         </div>
         
         <div id="exportButtons" class="mb-3 d-none text-center animate__animated animate__fadeIn animate__delay-4s">
             <button id="exportCsv" class="btn btn-success btn-modern me-2"><i class="fas fa-file-csv me-2"></i>Export Pivoted to CSV</button>
             <button id="exportXlsx" class="btn btn-info btn-modern me-2"><i class="fas fa-file-excel me-2"></i>Export Pivoted to XLSX</button>
-            <button id="exportRawXlsx" class="btn btn-primary btn-modern"><i class="fas fa-file-excel me-2"></i>Export Selected Raw Data</button>
+            <button id="exportRawXlsx" class="btn btn-primary btn-modern me-2"><i class="fas fa-file-excel me-2"></i>Export Selected Raw Data</button>
+            <button id="saveState" class="btn btn-warning btn-modern me-2"><i class="fas fa-save me-2"></i>Save State</button>
         </div>
         
         <div class="text-center mb-3">
             <button id="toggleChart" class="btn btn-secondary btn-modern d-none"><i class="fas fa-chart-bar me-2"></i>Show Chart View</button>
         </div>
-
+        
         <div id="output" class="animate__animated animate__fadeIn">
             <div class="placeholder-message">
                 <i class="fas fa-file-upload"></i>
@@ -93,25 +108,44 @@
         </div>
         <div id="chart-output" class="d-none animate__animated animate__fadeIn"></div>
         
+
+        
         <footer class="text-center mt-4">
             <p>Developed by Ashkan Norouzi &copy; 2025</p>
         </footer>
     </div>
-
+    <div class="modal fade" id="loadStateModal" tabindex="-1" aria-labelledby="loadStateModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content animate__animated animate__zoomIn">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loadStateModalLabel"><i class="fas fa-folder-open me-2"></i>Load Saved State</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="list-group list-group-flush" id="savedStatesList">
+                        <li class="list-group-item text-muted"><i class="fas fa-info-circle me-2"></i>No saved states</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
 
-    <script src="./js/jquery-3.6.0.min.js"></script>
-    <script src="./js/jquery-ui.min.js"></script>
-    <script src="./js/papaparse.min.js"></script>
-    <script src="./js/pivot.min.js"></script>
-    <script src="./js/xlsx.full.min.js"></script>
-    <script src="./js/loader.js"></script>
-    <script src="./js/d3.min.js"></script>
-    <script src="./js/c3.min.js"></script>
-    <script src="./js/plotly-latest.min.js"></script>
-    <script src="./js/d3_renderers.min.js"></script>
-    <script src="./js/c3_renderers.min.js"></script>
-    <script src="./js/bootstrap.bundle.min.js"></script>
-    <script src="./js/script.js"></script>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script src="js/jquery-ui.min.js"></script>
+    <script src="js/papaparse.min.js"></script>
+    <script src="js/pivot.min.js"></script>
+    <script src="js/xlsx.full.min.js"></script>
+    <script src="js/loader.js"></script>
+    <script src="js/d3.min.js"></script>
+    <script src="js/c3.min.js"></script>
+    <script src="js/plotly-latest.min.js"></script>
+    <script src="js/d3_renderers.min.js"></script>
+    <script src="js/c3_renderers.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/script.js"></script>
 </body>
 </html>

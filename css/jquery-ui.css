@@ -787,6 +787,7 @@ button.ui-button::-moz-focus-inner {
 .ui-sortable-handle {
 	-ms-touch-action: none;
 	touch-action: none;
+	padding: 10px;
 }
 .ui-spinner {
 	position: relative;
