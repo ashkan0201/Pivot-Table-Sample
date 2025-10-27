@@ -1,8 +1,3 @@
-// Global variables to manage XLSX file handling
-// Utility function to check if a cell is non-empty
-
-// Loads and parses XLSX file data into CSV format
-
 // Generates a unique UUID for state saving
 function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -33,6 +28,9 @@ $(document).ready(function() {
         const stored = localStorage.getItem('pivotConfig');
         if (stored) {
             pivotConfig = JSON.parse(stored);
+            // اطمینان از خالی بودن inclusions و exclusions هنگام بارگذاری
+            pivotConfig.inclusions = pivotConfig.inclusions || {};
+            pivotConfig.exclusions = pivotConfig.exclusions || {};
         }
     }
 
@@ -52,7 +50,7 @@ $(document).ready(function() {
         });
     }, observerOptions);
 
-    // Observe output and chart-output elements
+    // Observe output element
     observer.observe(document.getElementById('output'));
 
     // Toggles unsaved changes alert visibility
@@ -71,7 +69,9 @@ $(document).ready(function() {
             'background-color': '',
             'color': ''
         });
-        $('table.pvtTable th.pvtColLabel.pvtFiltered, table.pvtTable th.pvtRowLabel.pvtFiltered').css({
+        const filteredHeaders = $('table.pvtTable th.pvtColLabel.pvtFiltered, table.pvtTable th.pvtRowLabel.pvtFiltered');
+        console.log('Filtered headers:', filteredHeaders.map((i, el) => $(el).text()).get()); // لاگ برای دیباگ
+        filteredHeaders.css({
             'background-color': '#fff3cd',
             'color': '#333',
             'font-style': 'italic'
@@ -103,7 +103,7 @@ $(document).ready(function() {
         $('#fileInput').click();
     });
 
-    // Handle file upload (CSV or XLSX)
+    // Handle file upload (CSV only)
     $('#fileInput').on('change', function(e) {
         const file = e.target.files[0];
         if (!file) {
@@ -162,10 +162,20 @@ $(document).ready(function() {
                     vals: [],
                     aggregatorName: 'Count',
                     rendererName: 'Table',
-                    inclusions: {}, // اطمینان از خالی بودن
-                    exclusions: {}  // اطمینان از خالی بودن
+                    inclusions: {},
+                    exclusions: {},
+                    rowTotals: true, // فعال کردن Totals برای ردیف‌ها (در rendererOptions استفاده می‌شود)
+                    colTotals: true  // فعال کردن Totals برای ستون‌ها (در rendererOptions استفاده می‌شود)
                 };
-                console.log('Initial pivotConfig:', pivotConfig); // لاگ برای دیباگ
+                // بررسی هدرها
+                const headers = Object.keys(parsedData[0]);
+                const invalidHeaders = headers.filter(h => !h || h.trim() === '');
+                if (invalidHeaders.length > 0) {
+                    showToast('Invalid headers found in CSV: ' + invalidHeaders.join(', '), 'error');
+                    return;
+                }
+                console.log('Parsed Data:', parsedData); // لاگ برای دیباگ
+                console.log('Headers:', headers); // لاگ برای دیباگ
                 saveConfig();
                 renderPivotTable();
                 $('#exportButtons').removeClass('d-none');
@@ -195,7 +205,9 @@ $(document).ready(function() {
                 colOrder: pivotConfig?.colOrder || 'value_z_to_a',
                 hiddenAttributes: pivotConfig?.hiddenAttributes || ['$$hashKey'],
                 inclusions: pivotConfig?.inclusions || {},
-                exclusions: pivotConfig?.exclusions || {}
+                exclusions: pivotConfig?.exclusions || {},
+                rowTotals: pivotConfig?.rowTotals || true,
+                colTotals: pivotConfig?.colTotals || true
             };
             const state = {
                 pivotConfig: cleanPivotConfig,
@@ -228,13 +240,9 @@ $(document).ready(function() {
 
     // Button to load states from a selected folder
     $('#loadState').on('click', async function() {
-        // Clear both localStorage and sessionStorage before loading state
         localStorage.clear();
         sessionStorage.clear();
-
-        // Explicitly reset pivotConfig to ensure no previous config is used
         pivotConfig = null;
-
         try {
             const dir = await window.showDirectoryPicker();
             const savedStates = [];
@@ -272,9 +280,9 @@ $(document).ready(function() {
             } else {
                 savedStates.forEach(stateEntry => {
                     const date = new Date(stateEntry.timestamp);
-                    const formattedDate = date.toLocaleString('en-GB', { 
-                        year: 'numeric', month: '2-digit', day: '2-digit', 
-                        hour: '2-digit', minute: '2-digit', second: '2-digit' 
+                    const formattedDate = date.toLocaleString('en-GB', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit'
                     });
                     const state = stateEntry.state;
                     const displayName = `${state.currentFileName || 'Untitled'}`;
@@ -287,7 +295,6 @@ $(document).ready(function() {
                     `);
                 });
             }
-            // Attach click handler to load saved state
             $list.off('click', 'li[data-state-id]');
             $list.on('click', 'li[data-state-id]', function() {
                 const stateId = $(this).data('state-id');
@@ -316,19 +323,24 @@ $(document).ready(function() {
                 $('#fullPageLoader').css('display', 'none');
                 return;
             }
-            // Validate structure
             if (!stateEntry.state || !stateEntry.id || !stateEntry.timestamp) {
                 showToast('Invalid state file structure.', 'error');
                 $('#fullPageLoader').css('display', 'none');
                 return;
             }
             const state = stateEntry.state;
-            pivotConfig = state.pivotConfig || { rows: [], cols: [], vals: [], aggregatorName: 'Count', rendererName: 'Table' };
+            pivotConfig = {
+                ...state.pivotConfig,
+                inclusions: {}, // ریست فیلترها
+                exclusions: {}, // ریست فیلترها
+                rowTotals: true,
+                colTotals: true
+            };
             aData = state.aData || [];
             parsedData = state.parsedData;
             currentFileName = state.currentFileName || '';
             isDataLoaded = parsedData && parsedData.length > 0;
-            saveConfig(); // Save loaded config to localStorage
+            saveConfig();
 
             if (currentFileName) {
                 $('#fileName').text(currentFileName);
@@ -359,9 +371,84 @@ $(document).ready(function() {
         $('#fullPageLoader').css('display', 'none');
     }
 
+    // Apply drag-and-drop functionality (تعریف خارج از renderPivotTable برای رفع scoping)
+    function applyDragAndDrop() {
+        console.log('Applying drag-and-drop...'); // لاگ برای دیباگ
+        $('.pvtAttr').each(function() {
+            if (!$(this).hasClass('ui-draggable')) {
+                $(this).draggable({
+                    helper: 'clone',
+                    appendTo: 'body',
+                    containment: 'window',
+                    zIndex: 1000,
+                    revert: 'invalid',
+                    cursor: 'move',
+                    start: function(event, ui) {
+                        $(ui.helper).addClass('ui-draggable-dragging').css({
+                            'padding': '8px 12px',
+                            'border-radius': '4px',
+                            'background': '#fff',
+                            'border': '1px solid #007bff',
+                            'color': '#333'
+                        });
+                        console.log('Dragging started:', $(this).text());
+                    },
+                    stop: function(event, ui) {
+                        $(ui.helper).removeClass('ui-draggable-dragging');
+                    }
+                });
+                $(this).on('mousedown touchstart', function(e) {
+                    e.stopPropagation();
+                    console.log('Mouse down on:', $(this).text());
+                });
+            }
+        });
+
+        $('.pvtRows, .pvtCols, .pvtUnused').each(function() {
+            if (!$(this).hasClass('ui-droppable')) {
+                $(this).droppable({
+                    accept: '.pvtAttr',
+                    hoverClass: 'ui-droppable-active',
+                    activeClass: 'ui-droppable-active',
+                    tolerance: 'intersect',
+                    drop: function(event, ui) {
+                        $('#fullPageLoader').css('display', 'flex');
+                        const attr = ui.draggable.text().trim().replace(' ▾', '');
+                        const target = $(this).hasClass('pvtRows') ? 'rows' :
+                                    $(this).hasClass('pvtCols') ? 'cols' : 'unused';
+                        console.log('Dropped:', { attr, target });
+                        updatePivotConfig(attr, target);
+                        // Re-render table immediately
+                        $('#output').empty().pivotUI(parsedData, {
+                            ...pivotConfig,
+                            rendererName: 'Table'
+                        }, true);
+                        setTimeout(() => {
+                            $('.pvtTable').addClass('table table-striped table-bordered table-hover');
+                            $('.pvtTable').css({
+                                'width': 'auto',
+                                'max-width': '100%',
+                                'max-height': '100%'
+                            });
+                            $('.pvtRendererArea').css({
+                                'overflow-x': 'auto',
+                                'overflow-y': 'auto',
+                                'max-height': '650px'
+                            });
+                            applyFilteredHeaderStyles();
+                            applyDragAndDrop(); // فراخوانی مجدد
+                            $('#fullPageLoader').css('display', 'none');
+                            console.log('Table rendered after drop:', $('#output .pvtTable').length);
+                        }, 0);
+                    }
+                });
+            }
+        });
+    }
+
     // Renders the pivot table
     function renderPivotTable() {
-        loadConfig(); // Load config from localStorage before rendering
+        loadConfig();
         $('#fullPageLoader').css('display', 'flex');
         if (!parsedData || parsedData.length === 0) {
             $('#fullPageLoader').css('display', 'none');
@@ -370,11 +457,32 @@ $(document).ready(function() {
         }
         $('#output').empty();
         if (!pivotConfig) {
-            pivotConfig = { rows: [], cols: [], vals: [], aggregatorName: 'Count', rendererName: 'Table' };
+            pivotConfig = {
+                rows: [],
+                cols: [],
+                vals: [],
+                aggregatorName: 'Count',
+                rendererName: 'Table',
+                inclusions: {},
+                exclusions: {},
+                rowTotals: true,
+                colTotals: true
+            };
         }
         pivotConfig.rendererName = 'Table';
 
-        // Initialize pivotUI for table rendering
+        // بررسی نوع داده‌ها برای Aggregator
+        if (pivotConfig.vals.length > 0) {
+            const valField = pivotConfig.vals[0];
+            const isNumeric = parsedData.every(row => typeof row[valField] === 'number' && !isNaN(row[valField]));
+            if (!isNumeric && pivotConfig.aggregatorName === 'Sum') {
+                showToast('Selected value field contains non-numeric data. Switching to Count.', 'warning');
+                pivotConfig.aggregatorName = 'Count';
+            }
+        }
+
+        console.log('Rendering pivot table with config:', pivotConfig); // لاگ برای دیباگ
+
         $('#output').pivotUI(parsedData, {
             rows: pivotConfig.rows || [],
             cols: pivotConfig.cols || [],
@@ -387,13 +495,15 @@ $(document).ready(function() {
                 $.pivotUtilities.renderers,
                 $.pivotUtilities.gchart_renderers,
                 $.pivotUtilities.d3_renderers,
-                $.pivotUtilities.plotly_renderers,
+                // $.pivotUtilities.plotly_renderers, // کامنت کنید اگر Plotly استفاده نمی‌کنید تا هشدار برود
                 $.pivotUtilities.c3_renderers
             ),
             hiddenAttributes: pivotConfig.hiddenAttributes || ['$$hashKey'],
             menuLimit: 500000,
             rendererOptions: {
                 table: {
+                    rowTotals: true, // فعال کردن Totals برای ردیف‌ها (درست در rendererOptions)
+                    colTotals: true, // فعال کردن Totals برای ستون‌ها (درست در rendererOptions)
                     clickCallback: function(e, value, filters, pivotData) {
                         aData = [];
                         pivotData.forEachMatchingRecord(filters, function(record) {
@@ -405,138 +515,79 @@ $(document).ready(function() {
                 }
             },
             onRefresh: function(config) {
-                pivotConfig = { ...config };
-                saveConfig(); // Save updated config to localStorage
-                setUnsavedChanges(true);
-                $('.pvtTable').addClass('table table-striped table-bordered table-hover');
-                $('.pvtTable').css({
-                    'width': 'auto',
-                    'max-width': '100%',
-                    'max-height': '100%'
-                });
-                $('.pvtRendererArea').css({
-                    'overflow-x': 'auto',
-                    'overflow-y': 'auto',
-                    'max-height': '650px'
-                });
-
-                // Clear previous drag-and-drop events
-                $('.pvtAttr, .pvtRows, .pvtCols, .pvtUnused').each(function() {
-                    $(this).removeData('ui-draggable')
-                        .removeData('ui-droppable')
-                        .removeClass('ui-draggable ui-draggable-dragging ui-droppable ui-droppable-hover ui-droppable-active')
-                        .off('.draggable')
-                        .off('.droppable')
-                        .off('click mousedown touchstart');
-                });
-
-                // Apply drag-and-drop functionality
-                function applyDragAndDrop() {
-                    $('.pvtAttr').each(function() {
-                        if (!$(this).hasClass('ui-draggable')) {
-                            $(this).draggable({
-                                helper: 'clone',
-                                appendTo: 'body',
-                                containment: 'window',
-                                zIndex: 1000,
-                                revert: 'invalid',
-                                cursor: 'move',
-                                start: function(event, ui) {
-                                    $(ui.helper).addClass('ui-draggable-dragging').css({
-                                        'padding': '8px 12px',
-                                        'border-radius': '4px',
-                                        'background': '#fff',
-                                        'border': '1px solid #007bff',
-                                        'color': '#333'
-                                    });
-                                    console.log('Dragging started:', $(this).text());
-                                },
-                                stop: function(event, ui) {
-                                    $(ui.helper).removeClass('ui-draggable-dragging');
-                                }
-                            });
-                            $(this).on('mousedown touchstart', function(e) {
-                                e.stopPropagation();
-                                console.log('Mouse down on:', $(this).text());
-                            });
-                        }
+                try {
+                    pivotConfig = {
+                        ...config,
+                        inclusions: {}, // ریست فیلترها
+                        exclusions: {}  // ریست فیلترها
+                    };
+                    saveConfig();
+                    setUnsavedChanges(true);
+                    $('.pvtTable').addClass('table table-striped table-bordered table-hover');
+                    $('.pvtTable').css({
+                        'width': 'auto',
+                        'max-width': '100%',
+                        'max-height': '100%'
+                    });
+                    $('.pvtRendererArea').css({
+                        'overflow-x': 'auto',
+                        'overflow-y': 'auto',
+                        'max-height': '650px'
                     });
 
-                    $('.pvtRows, .pvtCols, .pvtUnused').each(function() {
-                        if (!$(this).hasClass('ui-droppable')) {
-                            $(this).droppable({
-                                accept: '.pvtAttr',
-                                hoverClass: 'ui-droppable-active',
-                                activeClass: 'ui-droppable-active',
-                                tolerance: 'intersect',
-                                drop: function(event, ui) {
-                                    $('#fullPageLoader').css('display', 'flex');
-                                    const attr = ui.draggable.text().trim().replace(' ▾', '');
-                                    const target = $(this).hasClass('pvtRows') ? 'rows' :
-                                                $(this).hasClass('pvtCols') ? 'cols' : 'unused';
-                                    console.log('Dropped:', { attr, target });
-                                    updatePivotConfig(attr, target);
-                                    // Re-render table immediately
-                                    $('#output').empty().pivotUI(parsedData, {
-                                        ...pivotConfig,
-                                        rendererName: 'Table'
-                                    }, true);
-                                    setTimeout(() => {
-                                        $('.pvtTable').addClass('table table-striped table-bordered table-hover');
-                                        $('.pvtTable').css({
-                                            'width': 'auto',
-                                            'max-width': '100%',
-                                            'max-height': '100%'
-                                        });
-                                        $('.pvtRendererArea').css({
-                                            'overflow-x': 'auto',
-                                            'overflow-y': 'auto',
-                                            'max-height': '650px'
-                                        });
-                                        applyFilteredHeaderStyles();
-                                        applyDragAndDrop();
-                                        $('#fullPageLoader').css('display', 'none');
-                                        console.log('Table rendered:', $('#output .pvtTable').length);
-                                        console.log('Draggable elements:', $('.pvtAttr').length);
-                                        console.log('Droppable elements:', $('.pvtRows, .pvtCols, .pvtUnused').length);
-                                    }, 0);
-                                }
-                            });
-                        }
+                    // Clear previous drag-and-drop events
+                    $('.pvtAttr, .pvtRows, .pvtCols, .pvtUnused').each(function() {
+                        $(this).removeData('ui-draggable')
+                            .removeData('ui-droppable')
+                            .removeClass('ui-draggable ui-draggable-dragging ui-droppable ui-droppable-hover ui-droppable-active')
+                            .off('.draggable')
+                            .off('.droppable')
+                            .off('click mousedown touchstart');
                     });
+
+                    applyFilteredHeaderStyles();
+                    applyDragAndDrop(); // حالا scope درست است
+                    console.log('onRefresh completed successfully');
+                } catch (err) {
+                    console.error('Error in onRefresh:', err);
+                    showToast('Error rendering table: ' + err.message, 'error');
+                } finally {
+                    $('#fullPageLoader').css('display', 'none'); // اطمینان از قطع لودر حتی در خطا
                 }
-
-                applyDragAndDrop();
-                applyFilteredHeaderStyles();
-                $('#fullPageLoader').css('display', 'none');
                 console.log('Table rendered:', $('#output .pvtTable').length);
                 console.log('Draggable elements:', $('.pvtAttr').length);
                 console.log('Droppable elements:', $('.pvtRows, .pvtCols, .pvtUnused').length);
             }
-        }, true); // Force overwrite to reset previous state
+        }, true);
     }
 
     // Updates pivot configuration when headers are dragged
     function updatePivotConfig(attr, target) {
         if (!pivotConfig) {
-            pivotConfig = { rows: [], cols: [], vals: [], aggregatorName: 'Count', rendererName: 'Table' };
+            pivotConfig = {
+                rows: [],
+                cols: [],
+                vals: [],
+                aggregatorName: 'Count',
+                rendererName: 'Table',
+                inclusions: {},
+                exclusions: {},
+                rowTotals: true,
+                colTotals: true
+            };
         }
-        // Remove sorting icon from attribute name
         const cleanAttr = attr.replace(' ▾', '');
-        // Remove attribute from rows and cols
         pivotConfig.rows = pivotConfig.rows.filter(item => item !== cleanAttr);
         pivotConfig.cols = pivotConfig.cols.filter(item => item !== cleanAttr);
-        // Add attribute to the appropriate target
         if (target === 'rows') {
             pivotConfig.rows.push(cleanAttr);
         } else if (target === 'cols') {
             pivotConfig.cols.push(cleanAttr);
-        } else if (target === 'unused') {
-            // Attribute is only removed from rows and cols
         }
-        // Preserve rendererName based on current view (chart or table)
         pivotConfig.rendererName = 'Table';
-        saveConfig(); // Save updated config
+        pivotConfig.inclusions = {}; // ریست فیلترها
+        pivotConfig.exclusions = {}; // ریست فیلترها
+        saveConfig();
         setUnsavedChanges(true);
         console.log('Updated pivotConfig:', pivotConfig);
     }
@@ -546,49 +597,12 @@ $(document).ready(function() {
         $('#fullPageLoader').css('display', 'flex');
         setTimeout(() => {
             try {
-                const $pivotTable = $('#output table.pvtTable');
-                if ($pivotTable.length === 0) {
+                const grid = extractTableData();
+                if (!grid) {
                     showToast('No pivoted data found.', 'warning');
                     $('#fullPageLoader').hide();
                     return;
                 }
-
-                const grid = [];
-                const skipMap = {};
-
-                $pivotTable.find('tr').each((rowIndex, tr) => {
-                    const row = [];
-                    let colIndex = 0;
-
-                    $(tr).find('th, td').each((_, cell) => {
-                        const $cell = $(cell);
-                        const text = $cell.text().trim();
-                        const colspan = parseInt($cell.attr('colspan')) || 1;
-                        const rowspan = parseInt($cell.attr('rowspan')) || 1;
-
-                        while (skipMap[`${rowIndex},${colIndex}`]) {
-                            row.push(skipMap[`${rowIndex},${colIndex}`]);
-                            colIndex++;
-                        }
-
-                        row.push(text);
-
-                        for (let c = 1; c < colspan; c++) {
-                            row.push('');
-                            colIndex++;
-                        }
-
-                        for (let r = 1; r < rowspan; r++) {
-                            for (let c = 0; c < colspan; c++) {
-                                skipMap[`${rowIndex + r},${colIndex - (colspan - 1) + c}`] = '';
-                            }
-                        }
-
-                        colIndex++;
-                    });
-
-                    grid.push(row);
-                });
 
                 const csvContent = grid.map(r => r.map(cell => (cell.includes(',') ? `"${cell}"` : cell)).join(',')).join('\n');
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -597,7 +611,7 @@ $(document).ready(function() {
                 link.download = 'pivoted_export.csv';
                 link.click();
 
-                showToast('Exported pivoted data to CSV with merged cells successfully!', 'success');
+                showToast('Exported pivoted data to CSV successfully!', 'success');
             } catch (err) {
                 showToast('Error exporting CSV: ' + err.message, 'error');
             }
@@ -716,17 +730,17 @@ $(document).ready(function() {
         const bodyRowCount = $tbody.find('tr').length;
 
         if (headerRowCount === 0 || bodyRowCount === 0) {
+            showToast('No data in table to export.', 'warning');
             return null;
         }
 
         let grid = [];
         let maxCols = 0;
-
         let headerGrid = [];
-        let cityRow = [];
-        let ageRow = [];
-        let colIndexMap = [];
+        let colLabels = [];
+        let subColLabels = [];
 
+        // پردازش هدرها
         $thead.find('tr').each(function(rowIndex) {
             let colIndex = 0;
             if (!headerGrid[rowIndex]) headerGrid[rowIndex] = [];
@@ -740,14 +754,13 @@ $(document).ready(function() {
 
                 if (rowIndex === 0 && !$th.hasClass('pvtAxisLabel')) {
                     for (let c = 0; c < colspan; c++) {
-                        cityRow[colIndex + c] = text;
-                        colIndexMap[colIndex + c] = text;
+                        colLabels[colIndex + c] = text || '';
                     }
                 }
 
                 if (rowIndex === 1 && !$th.hasClass('pvtAxisLabel')) {
                     for (let c = 0; c < colspan; c++) {
-                        ageRow[colIndex + c] = text;
+                        subColLabels[colIndex + c] = text || '';
                     }
                 }
 
@@ -762,11 +775,13 @@ $(document).ready(function() {
             maxCols = Math.max(maxCols, colIndex);
         });
 
+        // اطمینان از اضافه شدن ستون Totals
         let finalHeaderGrid = [];
-        finalHeaderGrid[0] = ['', ...cityRow.slice(1), 'Totals'];
-        finalHeaderGrid[1] = ['Age', ...ageRow.slice(1), ''];
-        finalHeaderGrid[2] = ['Name', ...new Array(maxCols - 1).fill(''), ''];
+        finalHeaderGrid[0] = ['', ...colLabels.slice(1), 'Totals'];
+        finalHeaderGrid[1] = [pivotConfig.rows[0] || 'Row', ...subColLabels.slice(1), ''];
+        finalHeaderGrid[2] = ['', ...new Array(maxCols - 1).fill(''), ''];
 
+        // پردازش بدنه جدول
         let bodyGrid = [];
         $tbody.find('tr').each(function(rowIndex) {
             let colIndex = 0;
@@ -787,8 +802,10 @@ $(document).ready(function() {
             bodyGrid.push(row);
         });
 
+        // ترکیب هدر و بدنه
         grid = [...finalHeaderGrid, ...bodyGrid];
 
+        // اطمینان از تنظیم درست برچسب‌های ردیف
         const firstColIsRowLabel = bodyGrid.every(row => row[0] !== '');
         if (firstColIsRowLabel) {
             for (let r = headerRowCount; r < grid.length; r++) {
@@ -796,6 +813,7 @@ $(document).ready(function() {
             }
         }
 
+        console.log('Extracted Grid:', grid); // لاگ برای دیباگ
         return grid;
     }
 
