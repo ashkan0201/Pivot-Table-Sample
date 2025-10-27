@@ -115,16 +115,11 @@ $(document).ready(function() {
             return;
         }
 
-        // Clear both localStorage and sessionStorage before processing the file
         localStorage.clear();
         sessionStorage.clear();
-
-        // Explicitly reset pivotConfig to ensure no previous config is used
         pivotConfig = null;
-
-        // Reset state
         parsedData = null;
-        aData = []; // Reset selected data
+        aData = [];
         isDataLoaded = false;
         currentFileName = file.name;
         $('#fileName').text(currentFileName);
@@ -138,9 +133,8 @@ $(document).ready(function() {
         $('#exportButtons').addClass('d-none');
         $('#fullPageLoader').css('display', 'flex');
 
-        setUnsavedChanges(false); // Fresh upload has no unsaved changes initially
+        setUnsavedChanges(false);
 
-        // Handle CSV file
         Papa.parse(file, {
             header: true,
             skipEmptyLines: true,
@@ -149,11 +143,7 @@ $(document).ready(function() {
             complete: function(results) {
                 $('#fullPageLoader').css('display', 'none');
                 if (results.errors.length > 0) {
-                    showToast('CSV parsing errors: ' + results.errors.map(err => {
-                        if (err.type === 'Quotes') return 'Invalid quotes in CSV.';
-                        if (err.type === 'Delimiter') return 'Invalid delimiter detected.';
-                        return err.message;
-                    }).join(', '), 'error');
+                    showToast('CSV parsing errors: ' + results.errors.map(err => err.message).join(', '), 'error');
                     return;
                 }
                 if (!results.data || results.data.length === 0) {
@@ -166,8 +156,17 @@ $(document).ready(function() {
                 }
                 parsedData = results.data;
                 isDataLoaded = true;
-                pivotConfig = { rows: [], cols: [], vals: [], aggregatorName: 'Count', rendererName: 'Table' };
-                saveConfig(); // Save initial config
+                pivotConfig = {
+                    rows: [],
+                    cols: [],
+                    vals: [],
+                    aggregatorName: 'Count',
+                    rendererName: 'Table',
+                    inclusions: {}, // اطمینان از خالی بودن
+                    exclusions: {}  // اطمینان از خالی بودن
+                };
+                console.log('Initial pivotConfig:', pivotConfig); // لاگ برای دیباگ
+                saveConfig();
                 renderPivotTable();
                 $('#exportButtons').removeClass('d-none');
                 showToast('File loaded successfully!', 'success');
@@ -177,7 +176,7 @@ $(document).ready(function() {
                 showToast('Error parsing CSV: ' + error.message, 'error');
             }
         });
-        $(this).val(''); // Clear file input to allow re-upload
+        $(this).val('');
     });
 
     // Save current state to a user-selected file location
