@@ -1,3 +1,4 @@
+// js/script.js
 // Generates a unique UUID for state saving
 function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -28,7 +29,6 @@ $(document).ready(function() {
         const stored = localStorage.getItem('pivotConfig');
         if (stored) {
             pivotConfig = JSON.parse(stored);
-            // اطمینان از خالی بودن inclusions و exclusions هنگام بارگذاری
             pivotConfig.inclusions = pivotConfig.inclusions || {};
             pivotConfig.exclusions = pivotConfig.exclusions || {};
         }
@@ -70,7 +70,7 @@ $(document).ready(function() {
             'color': ''
         });
         const filteredHeaders = $('table.pvtTable th.pvtColLabel.pvtFiltered, table.pvtTable th.pvtRowLabel.pvtFiltered');
-        console.log('Filtered headers:', filteredHeaders.map((i, el) => $(el).text()).get()); // لاگ برای دیباگ
+        console.log('Filtered headers:', filteredHeaders.map((i, el) => $(el).text()).get());
         filteredHeaders.css({
             'background-color': '#fff3cd',
             'color': '#333',
@@ -164,18 +164,17 @@ $(document).ready(function() {
                     rendererName: 'Table',
                     inclusions: {},
                     exclusions: {},
-                    rowTotals: true, // فعال کردن Totals برای ردیف‌ها (در rendererOptions استفاده می‌شود)
-                    colTotals: true  // فعال کردن Totals برای ستون‌ها (در rendererOptions استفاده می‌شود)
+                    rowTotals: true,
+                    colTotals: true
                 };
-                // بررسی هدرها
                 const headers = Object.keys(parsedData[0]);
                 const invalidHeaders = headers.filter(h => !h || h.trim() === '');
                 if (invalidHeaders.length > 0) {
                     showToast('Invalid headers found in CSV: ' + invalidHeaders.join(', '), 'error');
                     return;
                 }
-                console.log('Parsed Data:', parsedData); // لاگ برای دیباگ
-                console.log('Headers:', headers); // لاگ برای دیباگ
+                console.log('Parsed Data:', parsedData);
+                console.log('Headers:', headers);
                 saveConfig();
                 renderPivotTable();
                 $('#exportButtons').removeClass('d-none');
@@ -314,7 +313,7 @@ $(document).ready(function() {
         $('#fullPageLoader').css('display', 'flex');
         try {
             const fileName = `${stateId}.json`;
-            const fileHandle = await dir.getFileHandle(fileName);
+            const fileHandle = await dir.getFileHandleÆ(fileName);
             const file = await fileHandle.getFile();
             const text = await file.text();
             const stateEntry = JSON.parse(text);
@@ -331,8 +330,8 @@ $(document).ready(function() {
             const state = stateEntry.state;
             pivotConfig = {
                 ...state.pivotConfig,
-                inclusions: {}, // ریست فیلترها
-                exclusions: {}, // ریست فیلترها
+                inclusions: {},
+                exclusions: {},
                 rowTotals: true,
                 colTotals: true
             };
@@ -371,9 +370,9 @@ $(document).ready(function() {
         $('#fullPageLoader').css('display', 'none');
     }
 
-    // Apply drag-and-drop functionality (تعریف خارج از renderPivotTable برای رفع scoping)
+    // Apply drag-and-drop functionality
     function applyDragAndDrop() {
-        console.log('Applying drag-and-drop...'); // لاگ برای دیباگ
+        console.log('Applying drag-and-drop...');
         $('.pvtAttr').each(function() {
             if (!$(this).hasClass('ui-draggable')) {
                 $(this).draggable({
@@ -418,7 +417,6 @@ $(document).ready(function() {
                                     $(this).hasClass('pvtCols') ? 'cols' : 'unused';
                         console.log('Dropped:', { attr, target });
                         updatePivotConfig(attr, target);
-                        // Re-render table immediately
                         $('#output').empty().pivotUI(parsedData, {
                             ...pivotConfig,
                             rendererName: 'Table'
@@ -436,7 +434,7 @@ $(document).ready(function() {
                                 'max-height': '650px'
                             });
                             applyFilteredHeaderStyles();
-                            applyDragAndDrop(); // فراخوانی مجدد
+                            applyDragAndDrop();
                             $('#fullPageLoader').css('display', 'none');
                             console.log('Table rendered after drop:', $('#output .pvtTable').length);
                         }, 0);
@@ -471,7 +469,6 @@ $(document).ready(function() {
         }
         pivotConfig.rendererName = 'Table';
 
-        // بررسی نوع داده‌ها برای Aggregator
         if (pivotConfig.vals.length > 0) {
             const valField = pivotConfig.vals[0];
             const isNumeric = parsedData.every(row => typeof row[valField] === 'number' && !isNaN(row[valField]));
@@ -481,7 +478,7 @@ $(document).ready(function() {
             }
         }
 
-        console.log('Rendering pivot table with config:', pivotConfig); // لاگ برای دیباگ
+        console.log('Rendering pivot table with config:', pivotConfig);
 
         $('#output').pivotUI(parsedData, {
             rows: pivotConfig.rows || [],
@@ -495,22 +492,31 @@ $(document).ready(function() {
                 $.pivotUtilities.renderers,
                 $.pivotUtilities.gchart_renderers,
                 $.pivotUtilities.d3_renderers,
-                // $.pivotUtilities.plotly_renderers, // کامنت کنید اگر Plotly استفاده نمی‌کنید تا هشدار برود
                 $.pivotUtilities.c3_renderers
             ),
             hiddenAttributes: pivotConfig.hiddenAttributes || ['$$hashKey'],
             menuLimit: 500000,
             rendererOptions: {
                 table: {
-                    rowTotals: true, // فعال کردن Totals برای ردیف‌ها (درست در rendererOptions)
-                    colTotals: true, // فعال کردن Totals برای ستون‌ها (درست در rendererOptions)
+                    rowTotals: true,
+                    colTotals: true,
                     clickCallback: function(e, value, filters, pivotData) {
-                        aData = [];
+                        // CHANGE: Instead of storing data, open detail.html with selected data
+                        if (value === 0 || value === null || value === undefined) {
+                            showToast('No records for this cell (value is 0).', 'info');
+                            return;
+                        }
+                        let aData = [];
                         pivotData.forEachMatchingRecord(filters, function(record) {
                             aData.push({ ...record });
                         });
-                        setUnsavedChanges(true);
-                        showToast(`Selected ${aData.length} records for export`, 'info');
+                        if (aData.length > 0) {
+                            sessionStorage.setItem('selectedData', JSON.stringify(aData));
+                            window.open('detail.html', '_blank');
+                            showToast(`Opening details for ${aData.length} records...`, 'info');
+                        } else {
+                            showToast('No matching records found.', 'warning');
+                        }
                     }
                 }
             },
@@ -518,8 +524,8 @@ $(document).ready(function() {
                 try {
                     pivotConfig = {
                         ...config,
-                        inclusions: {}, // ریست فیلترها
-                        exclusions: {}  // ریست فیلترها
+                        inclusions: {},
+                        exclusions: {}
                     };
                     saveConfig();
                     setUnsavedChanges(true);
@@ -535,7 +541,6 @@ $(document).ready(function() {
                         'max-height': '650px'
                     });
 
-                    // Clear previous drag-and-drop events
                     $('.pvtAttr, .pvtRows, .pvtCols, .pvtUnused').each(function() {
                         $(this).removeData('ui-draggable')
                             .removeData('ui-droppable')
@@ -546,13 +551,13 @@ $(document).ready(function() {
                     });
 
                     applyFilteredHeaderStyles();
-                    applyDragAndDrop(); // حالا scope درست است
+                    applyDragAndDrop();
                     console.log('onRefresh completed successfully');
                 } catch (err) {
                     console.error('Error in onRefresh:', err);
                     showToast('Error rendering table: ' + err.message, 'error');
                 } finally {
-                    $('#fullPageLoader').css('display', 'none'); // اطمینان از قطع لودر حتی در خطا
+                    $('#fullPageLoader').css('display', 'none');
                 }
                 console.log('Table rendered:', $('#output .pvtTable').length);
                 console.log('Draggable elements:', $('.pvtAttr').length);
@@ -585,8 +590,8 @@ $(document).ready(function() {
             pivotConfig.cols.push(cleanAttr);
         }
         pivotConfig.rendererName = 'Table';
-        pivotConfig.inclusions = {}; // ریست فیلترها
-        pivotConfig.exclusions = {}; // ریست فیلترها
+        pivotConfig.inclusions = {};
+        pivotConfig.exclusions = {};
         saveConfig();
         setUnsavedChanges(true);
         console.log('Updated pivotConfig:', pivotConfig);
@@ -675,46 +680,6 @@ $(document).ready(function() {
         }, 100);
     });
 
-    // Export selected raw data to XLSX
-    $('#exportRawXlsx').on('click', function() {
-        $('#fullPageLoader').css('display', 'flex');
-        setTimeout(() => {
-            if (aData.length === 0) {
-                showToast('No data selected. Please click on a pivot table cell first.', 'warning');
-                $('#fullPageLoader').css('display', 'none');
-                return;
-            }
-
-            try {
-                const headers = Object.keys(aData[0]);
-                const rows = aData.map(row => {
-                    const rowData = {};
-                    headers.forEach(header => {
-                        rowData[header] = row[header] || '';
-                    });
-                    return rowData;
-                });
-
-                const worksheet = XLSX.utils.json_to_sheet(rows);
-                const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, 'SelectedData');
-                XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
-
-                const colWidths = headers.map(header => ({
-                    wch: Math.max(header.length, ...rows.map(row => String(row[header] || '').length)) + 2
-                }));
-                worksheet['!cols'] = colWidths;
-
-                XLSX.writeFile(workbook, 'selected_raw_data.xlsx');
-                showToast('Selected raw data exported to Excel successfully!', 'success');
-            } catch (err) {
-                showToast('Error exporting to XLSX: ' + err.message, 'error');
-            }
-
-            $('#fullPageLoader').css('display', 'none');
-        }, 100);
-    });
-
     // Extracts table data for export
     function extractTableData() {
         const $container = $('#output');
@@ -740,7 +705,6 @@ $(document).ready(function() {
         let colLabels = [];
         let subColLabels = [];
 
-        // پردازش هدرها
         $thead.find('tr').each(function(rowIndex) {
             let colIndex = 0;
             if (!headerGrid[rowIndex]) headerGrid[rowIndex] = [];
@@ -775,13 +739,11 @@ $(document).ready(function() {
             maxCols = Math.max(maxCols, colIndex);
         });
 
-        // اطمینان از اضافه شدن ستون Totals
         let finalHeaderGrid = [];
         finalHeaderGrid[0] = ['', ...colLabels.slice(1), 'Totals'];
         finalHeaderGrid[1] = [pivotConfig.rows[0] || 'Row', ...subColLabels.slice(1), ''];
         finalHeaderGrid[2] = ['', ...new Array(maxCols - 1).fill(''), ''];
 
-        // پردازش بدنه جدول
         let bodyGrid = [];
         $tbody.find('tr').each(function(rowIndex) {
             let colIndex = 0;
@@ -802,10 +764,8 @@ $(document).ready(function() {
             bodyGrid.push(row);
         });
 
-        // ترکیب هدر و بدنه
         grid = [...finalHeaderGrid, ...bodyGrid];
 
-        // اطمینان از تنظیم درست برچسب‌های ردیف
         const firstColIsRowLabel = bodyGrid.every(row => row[0] !== '');
         if (firstColIsRowLabel) {
             for (let r = headerRowCount; r < grid.length; r++) {
@@ -813,7 +773,7 @@ $(document).ready(function() {
             }
         }
 
-        console.log('Extracted Grid:', grid); // لاگ برای دیباگ
+        console.log('Extracted Grid:', grid);
         return grid;
     }
 

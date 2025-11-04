@@ -856,7 +856,7 @@ h1.modern-title {
   text-align: center;
   letter-spacing: 1px;
   background: linear-gradient(135deg, var(--accent), var(--accent-light));
-  -webkit-background-clip: text;
+
   -webkit-text-fill-color: transparent;
   position: relative;
   margin-bottom: 1.5rem;
@@ -901,4 +901,53 @@ h1.modern-title {
     --accent-glow: rgba(107, 0, 255, 0.5);
     --accent-glow-strong: rgba(170, 85, 255, 0.9);
   }
+}
+/* Virtual Table Styles (Addition for Performance) */
+.pvtVirtualContainer {
+    position: relative;
+    overflow-y: auto;
+    height: 650px; /* Match max-height of .pvtRendererArea */
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    background: white;
+}
+
+body[data-bs-theme="dark"] .pvtVirtualContainer {
+    background: #343a40;
+    border-color: #495057;
+}
+
+.pvtVirtualHeader {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f8f9fa;
+}
+
+body[data-bs-theme="dark"] .pvtVirtualHeader {
+    background: #495057;
+}
+
+.pvtVirtualRow {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 40px; /* Adjustable row height */
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #dee2e6;
+    padding: 0 14px;
+}
+
+body[data-bs-theme="dark"] .pvtVirtualRow {
+    border-bottom-color: #495057;
+}
+
+.pvtVirtualCell {
+    flex: 1;
+    min-width: 100px;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

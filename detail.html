@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Selected Data Details</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/css2.css">
+    <link rel="stylesheet" href="css/jquery-ui.css">
+    <link rel="stylesheet" type="text/css" href="css/pivot.min.css">
+    <link rel="stylesheet" href="css/all.min.css">
+    <link rel="stylesheet" href="css/animate.min.css"/>
+    <link rel="stylesheet" href="css/c3.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-bs-theme="light">
+    <div class="full-page-loader" id="fullPageLoader">
+        <div class="spinner"></div>
+    </div>
+    <div class="container">
+        <h1 class="mb-4 text-center animate__animated animate__fadeIn">Selected Data Details</h1>
+        <p class="lead-text-center-animated-text">
+            Below is the detailed raw data for the selected pivot cell. You can export it to XLSX.
+        </p>
+        
+        <div class="form-check form-switch mb-3 text-center animate__animated animate__fadeIn animate__delay-2s">
+            <input class="form-check-input" type="checkbox" id="themeToggle">
+            <label class="form-check-label" for="themeToggle"><i class="fas fa-moon me-2"></i>Dark Mode</label>
+        </div>
+        
+        <div id="detailOutput" class="animate__animated animate__fadeIn">
+            <div class="placeholder-message">
+                <i class="fas fa-info-circle"></i>
+                <p>Loading selected data...</p>
+            </div>
+        </div>
+        
+        <div id="exportButtons" class="mb-3 text-center animate__animated animate__fadeIn animate__delay-4s d-none">
+            <button id="exportRawXlsx" class="btn btn-primary btn-modern me-2"><i class="fas fa-file-excel me-2"></i>Export Selected Raw Data to XLSX</button>
+        </div>
+        
+        <footer class="text-center mt-4">
+            <p>Developed by Ashkan Norouzi &copy; 2025</p>
+        </footer>
+    </div>
+    <div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script src="js/jquery-ui.min.js"></script>
+    <script src="js/papaparse.min.js"></script>
+    <script src="js/pivot.min.js"></script>
+    <script src="js/xlsx.full.min.js"></script>
+    <script src="js/loader.js"></script>
+    <script src="js/d3.min.js"></script>
+    <script src="js/c3.min.js"></script>
+    <script src="js/plotly-latest.min.js"></script>
+    <script src="js/d3_renderers.min.js"></script>
+    <script src="js/c3_renderers.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/detail.js"></script>
+</body>
+</html>
