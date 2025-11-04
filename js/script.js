@@ -313,10 +313,12 @@ $(document).ready(function() {
         $('#fullPageLoader').css('display', 'flex');
         try {
             const fileName = `${stateId}.json`;
-            const fileHandle = await dir.getFileHandleÆ(fileName);
+            // خط درست:
+            const fileHandle = await dir.getFileHandle(fileName);
             const file = await fileHandle.getFile();
             const text = await file.text();
             const stateEntry = JSON.parse(text);
+
             if (stateEntry.signature !== "pivot_table_state_v1") {
                 showToast('Invalid state file. This file may not be a valid save from this application.', 'error');
                 $('#fullPageLoader').css('display', 'none');
@@ -327,6 +329,7 @@ $(document).ready(function() {
                 $('#fullPageLoader').css('display', 'none');
                 return;
             }
+
             const state = stateEntry.state;
             pivotConfig = {
                 ...state.pivotConfig,
@@ -369,7 +372,6 @@ $(document).ready(function() {
         }
         $('#fullPageLoader').css('display', 'none');
     }
-
     // Apply drag-and-drop functionality
     function applyDragAndDrop() {
         console.log('Applying drag-and-drop...');
@@ -501,22 +503,60 @@ $(document).ready(function() {
                     rowTotals: true,
                     colTotals: true,
                     clickCallback: function(e, value, filters, pivotData) {
-                        // CHANGE: Instead of storing data, open detail.html with selected data
+                        if (pivotConfig.rendererName !== 'Table') return;
+
                         if (value === 0 || value === null || value === undefined) {
                             showToast('No records for this cell (value is 0).', 'info');
                             return;
                         }
-                        let aData = [];
+
+                        let selectedCellData = [];
                         pivotData.forEachMatchingRecord(filters, function(record) {
-                            aData.push({ ...record });
+                            selectedCellData.push({ ...record });
                         });
-                        if (aData.length > 0) {
-                            sessionStorage.setItem('selectedData', JSON.stringify(aData));
-                            window.open('detail.html', '_blank');
-                            showToast(`Opening details for ${aData.length} records...`, 'info');
-                        } else {
+
+                        if (selectedCellData.length === 0) {
                             showToast('No matching records found.', 'warning');
+                            return;
                         }
+
+                        $('#cellInfo strong').text(selectedCellData.length);
+
+                        $('#downloadCellBtn').off('click').on('click', function() {
+                            try {
+                                const headers = Object.keys(selectedCellData[0]);
+                                const rows = selectedCellData.map(row => {
+                                    const r = {};
+                                    headers.forEach(h => r[h] = row[h] ?? '');
+                                    return r;
+                                });
+
+                                const ws = XLSX.utils.json_to_sheet(rows);
+                                const wb = XLSX.utils.book_new();
+                                XLSX.utils.book_append_sheet(wb, ws, 'Cell_Data');
+
+                                const colWidths = headers.map(h => ({
+                                    wch: Math.max(h.length, ...rows.map(r => String(r[h]).length)) + 2
+                                }));
+                                ws['!cols'] = colWidths;
+
+                                XLSX.writeFile(wb, `cell_data_${new Date().getTime()}.xlsx`);
+                                showToast('Cell data downloaded!', 'success');
+                                $('#cellActionModal').modal('hide');
+                            } catch (err) {
+                                showToast('Download failed: ' + err.message, 'error');
+                            }
+                        });
+
+                        $('#viewDetailBtn').off('click').on('click', function() {
+                            sessionStorage.setItem('selectedData', JSON.stringify(selectedCellData));
+                            window.open('detail.html', '_blank');
+                            $('#cellActionModal').modal('hide');
+                            showToast(`Opening ${selectedCellData.length} records in detail view...`, 'info');
+                        });
+
+                        const modal = new bootstrap.Modal('#cellActionModal', { backdrop: 'static' });
+                        modal.show();
                     }
                 }
             },

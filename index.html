@@ -13,6 +13,35 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body data-bs-theme="light">
+    <div class="modal fade" id="cellActionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg animate__animated animate__zoomIn">
+        <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title">
+            <i class="fas fa-mouse-pointer me-2"></i>
+            Cell Action
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center py-4">
+            <p class="mb-4" id="cellInfo">
+            <strong>0</strong> records found for this cell.
+            </p>
+            <div class="d-grid gap-2 d-md-flex justify-content-center">
+            <button id="downloadCellBtn" class="btn btn-success btn-lg me-md-2 px-4">
+                <i class="fas fa-file-excel me-2"></i>Download Excel
+            </button>
+            <button id="viewDetailBtn" class="btn btn-info btn-lg px-4">
+                <i class="fas fa-table me-2"></i>View Details
+            </button>
+            </div>
+        </div>
+        <div class="modal-footer justify-content-center text-muted small">
+            <span>Click outside to close</span>
+        </div>
+        </div>
+    </div>
+    </div>
     <div class="full-page-loader" id="fullPageLoader">
         <div class="spinner"></div>
     </div>
@@ -53,7 +82,7 @@
         <div id="exportButtons" class="mb-3 d-none text-center animate__animated animate__fadeIn animate__delay-4s">
             <button id="exportCsv" class="btn btn-success btn-modern me-2"><i class="fas fa-file-csv me-2"></i>Export Pivoted to CSV</button>
             <button id="exportXlsx" class="btn btn-info btn-modern me-2"><i class="fas fa-file-excel me-2"></i>Export Pivoted to XLSX</button>
-            <button id="exportRawXlsx" class="btn btn-primary btn-modern me-2"><i class="fas fa-file-excel me-2"></i>Export Selected Raw Data</button>
+            <!-- <button id="exportRawXlsx" class="btn btn-primary btn-modern me-2"><i class="fas fa-file-excel me-2"></i>Export Selected Raw Data</button> -->
             <button id="saveState" class="btn btn-warning btn-modern me-2"><i class="fas fa-save me-2"></i>Save State</button>
         </div>
         <div id="output" class="animate__animated animate__fadeIn">

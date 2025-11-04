@@ -39,7 +39,7 @@ $(document).ready(function() {
         }
     }
 
-    // Render the detail table with selected data
+    // Render the detail table with row numbers
     function renderDetailTable() {
         $('#fullPageLoader').css('display', 'flex');
         $('#detailOutput').empty();
@@ -55,36 +55,31 @@ $(document).ready(function() {
             return;
         }
 
-        // Create table
         const $table = $('<table class="table table-striped table-bordered table-hover pvtTable">');
         const headers = Object.keys(selectedData[0]);
+        const displayHeaders = ['#', ...headers];   // Add row number column
 
-        // Header row
-        const $thead = $('<thead>');
-        const $headerRow = $('<tr>');
-        headers.forEach(header => {
-            $headerRow.append(`<th>${header}</th>`);
-        });
-        $thead.append($headerRow);
+        // Header
+        const $thead = $('<thead><tr></tr></thead>');
+        displayHeaders.forEach(h => $thead.find('tr').append(`<th>${h}</th>`));
         $table.append($thead);
 
-        // Body rows
-        const $tbody = $('<tbody>');
-        selectedData.forEach(row => {
-            const $row = $('<tr>');
-            headers.forEach(header => {
-                $row.append(`<td>${row[header] || ''}</td>`);
-            });
-            $tbody.append($row);
+        // Body
+        const $tbody = $('<tbody></tbody>');
+        selectedData.forEach((row, idx) => {
+            const $tr = $('<tr></tr>');
+            $tr.append(`<td class="text-center">${idx + 1}</td>`);   // Row number
+            headers.forEach(h => $tr.append(`<td>${row[h] ?? ''}</td>`));
+            $tbody.append($tr);
         });
         $table.append($tbody);
 
-        $('#detailOutput').append($table);
-        $('#detailOutput').css({
+        $('#detailOutput').append($table).css({
             'overflow-x': 'auto',
             'overflow-y': 'auto',
             'max-height': '650px'
         });
+
         $('#fullPageLoader').css('display', 'none');
     }
 
