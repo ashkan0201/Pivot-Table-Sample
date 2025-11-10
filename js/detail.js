@@ -1,149 +1,209 @@
-// detail.js (new file for detail.html)
-$(document).ready(function() {
+/* detail.js – Neon DataTable with Copy/CSV/Excel + XLSX Export */
+$(document).ready(function () {
     let selectedData = [];
-    let hasUnsavedChanges = false;
+    let dataTable = null;
+    const $loader = $('#fullPageLoader');
 
-    // Theme toggle handler (light/dark mode) - similar to main script
-    $('#themeToggle').on('change', function() {
-        $('#fullPageLoader').css('display', 'flex');
+    /* -------------------------------------------------
+       Theme Toggle
+    ------------------------------------------------- */
+    $('#themeToggle').on('change', function () {
+        $loader.css('display', 'flex');
         setTimeout(() => {
-            const theme = this.checked ? 'dark' : 'light';
-            $('body').attr('data-bs-theme', theme);
-            const label = $('#themeToggle').next('label');
-            if (theme === 'dark') {
-                label.html('<i class="fas fa-sun me-2"></i>Light Mode');
-            } else {
-                label.html('<i class="fas fa-moon me-2"></i>Dark Mode');
-            }
-            showToast(`Switched to ${theme} mode`, 'success');
-            renderDetailTable();
-            $('#fullPageLoader').css('display', 'none');
+            const isDark = this.checked;
+            $('body').attr('data-bs-theme', isDark ? 'dark' : 'light');
+            const $label = $(this).next('label');
+            $label.html(isDark
+                ? '<i class="fas fa-sun me-2"></i>Light Mode'
+                : '<i class="fas fa-moon me-2"></i>Dark Mode');
+
+            showToast(`Switched to ${isDark ? 'dark' : 'light'} mode`, 'success');
+            if (dataTable) dataTable.draw();
+            $loader.hide();
         }, 500);
     });
 
-    // Load selected data from sessionStorage
+    /* -------------------------------------------------
+       Load Data
+    ------------------------------------------------- */
     function loadSelectedData() {
-        const storedData = sessionStorage.getItem('selectedData');
-        if (storedData) {
-            selectedData = JSON.parse(storedData);
-            sessionStorage.removeItem('selectedData'); // Clear after loading to avoid reuse
-            if (selectedData.length > 0) {
-                $('#exportButtons').removeClass('d-none');
-                renderDetailTable();
-                showToast(`Loaded ${selectedData.length} records`, 'success');
-            } else {
-                showToast('No data available.', 'warning');
-            }
-        } else {
-            showToast('No selected data found. Please select from the main pivot table.', 'error');
-        }
-    }
-
-    // Render the detail table with row numbers
-    function renderDetailTable() {
-        $('#fullPageLoader').css('display', 'flex');
-        $('#detailOutput').empty();
-
-        if (selectedData.length === 0) {
-            $('#detailOutput').html(`
-                <div class="placeholder-message">
-                    <i class="fas fa-info-circle"></i>
-                    <p>No data selected.</p>
-                </div>
-            `);
-            $('#fullPageLoader').css('display', 'none');
+        const raw = sessionStorage.getItem('selectedData');
+        if (!raw) {
+            showToast('No data selected. Return to pivot.', 'error');
+            renderPlaceholder('No data selected.');
             return;
         }
 
-        const $table = $('<table class="table table-striped table-bordered table-hover pvtTable">');
-        const headers = Object.keys(selectedData[0]);
-        const displayHeaders = ['#', ...headers];   // Add row number column
+        try {
+            selectedData = JSON.parse(raw);
+            sessionStorage.removeItem('selectedData');
+        } catch (e) {
+            showToast('Invalid data.', 'error');
+            return;
+        }
 
-        // Header
-        const $thead = $('<thead><tr></tr></thead>');
-        displayHeaders.forEach(h => $thead.find('tr').append(`<th>${h}</th>`));
-        $table.append($thead);
+        if (selectedData.length === 0) {
+            showToast('Empty selection.', 'warning');
+            renderPlaceholder('No records.');
+            return;
+        }
 
-        // Body
-        const $tbody = $('<tbody></tbody>');
-        selectedData.forEach((row, idx) => {
-            const $tr = $('<tr></tr>');
-            $tr.append(`<td class="text-center">${idx + 1}</td>`);   // Row number
-            headers.forEach(h => $tr.append(`<td>${row[h] ?? ''}</td>`));
-            $tbody.append($tr);
-        });
-        $table.append($tbody);
-
-        $('#detailOutput').append($table).css({
-            'overflow-x': 'auto',
-            'overflow-y': 'auto',
-            'max-height': '650px'
-        });
-
-        $('#fullPageLoader').css('display', 'none');
+        $('#exportButtons').removeClass('d-none');
+        renderDataTable();
+        showToast(`Loaded ${selectedData.length} record(s)`, 'success');
     }
 
-    // Export selected raw data to XLSX - similar to main script
-    $('#exportRawXlsx').on('click', function() {
-        $('#fullPageLoader').css('display', 'flex');
+    function renderPlaceholder(msg) {
+        $('#detailOutput').html(`
+            <div class="placeholder-message">
+                <i class="fas fa-info-circle"></i>
+                <p>${msg}</p>
+            </div>
+        `);
+        $loader.hide();
+    }
+
+    /* -------------------------------------------------
+       Render Neon DataTable
+    ------------------------------------------------- */
+    function renderDataTable() {
+        $loader.show();
+        $('#detailOutput').empty();
+
+        const headers = Object.keys(selectedData[0]);
+        const columns = [
+            { title: '#', data: null, orderable: false, className: 'text-center neon-glow', width: '60px' }
+        ];
+        headers.forEach(h => columns.push({
+            title: h,
+            data: h,
+            defaultContent: '',
+            className: 'text-truncate neon-cell'
+        }));
+
+        const $table = $('<table>', {
+            id: 'detailTable',
+            class: 'table table-striped table-hover display responsive nowrap w-100 neon-table'
+        });
+
+        $('#detailOutput').append($table);
+
+        dataTable = $table.DataTable({
+            data: selectedData,
+            columns: columns,
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            responsive: true,
+            dom: '<"neon-controls"B><"row"<"col-md-6"l><"col-md-6"f>>rtip',
+            buttons: [
+                {
+                    extend: 'copy',
+                    text: '<i class="fas fa-copy"></i>',
+                    titleAttr: 'Copy to clipboard',
+                    className: 'btn-neon btn-neon-copy'
+                },
+                {
+                    extend: 'csv',
+                    text: '<i class="fas fa-file-csv"></i>',
+                    titleAttr: 'Export as CSV',
+                    className: 'btn-neon btn-neon-csv'
+                },
+                {
+                    extend: 'excel',
+                    text: '<i class="fas fa-file-excel"></i>',
+                    titleAttr: 'Export as Excel',
+                    className: 'btn-neon btn-neon-excel'
+                }
+            ],
+            order: [],
+            language: {
+                search: "",
+                searchPlaceholder: "Search records...",
+                lengthMenu: "Show _MENU_",
+                info: "_START_–_END_ of _TOTAL_",
+                paginate: {
+                    next: '<i class="fas fa-chevron-right"></i>',
+                    previous: '<i class="fas fa-chevron-left"></i>'
+                }
+            },
+            drawCallback: function () {
+                const api = this.api();
+                const start = api.page.info().start;
+                api.column(0, { page: 'current' }).nodes().each((cell, i) => {
+                    cell.innerHTML = `<span class="neon-number">${start + i + 1}</span>`;
+                });
+            }
+        });
+
+        // Neon style for search & length
+        $('.dataTables_filter input').addClass('form-control neon-search');
+        $('.dataTables_length select').addClass('form-select neon-select');
+
+        $loader.hide();
+    }
+
+    /* -------------------------------------------------
+       Custom XLSX Export
+    ------------------------------------------------- */
+    $('#exportRawXlsx').on('click', function () {
+        $loader.show();
         setTimeout(() => {
-            if (selectedData.length === 0) {
-                showToast('No data selected.', 'warning');
-                $('#fullPageLoader').css('display', 'none');
+            if (!selectedData.length) {
+                showToast('No data.', 'warning');
+                $loader.hide();
                 return;
             }
 
             try {
                 const headers = Object.keys(selectedData[0]);
-                const rows = selectedData.map(row => {
-                    const rowData = {};
-                    headers.forEach(header => {
-                        rowData[header] = row[header] || '';
-                    });
-                    return rowData;
+                const rows = selectedData.map(r => {
+                    const o = {};
+                    headers.forEach(h => o[h] = r[h] ?? '');
+                    return o;
                 });
 
-                const worksheet = XLSX.utils.json_to_sheet(rows);
-                const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, 'SelectedData');
-                XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Data');
 
-                const colWidths = headers.map(header => ({
-                    wch: Math.max(header.length, ...rows.map(row => String(row[header] || '').length)) + 2
+                const colWidths = headers.map(h => ({
+                    wch: Math.max(h.length, ...rows.map(r => String(r[h] ?? '').length)) + 3
                 }));
-                worksheet['!cols'] = colWidths;
+                ws['!cols'] = colWidths;
 
-                XLSX.writeFile(workbook, 'selected_raw_data.xlsx');
-                showToast('Selected raw data exported to Excel successfully!', 'success');
-            } catch (err) {
-                showToast('Error exporting to XLSX: ' + err.message, 'error');
+                XLSX.writeFile(wb, 'selected_data.xlsx');
+                showToast('Exported to XLSX!', 'success');
+            } catch (e) {
+                showToast('Export failed.', 'error');
             }
-
-            $('#fullPageLoader').css('display', 'none');
+            $loader.hide();
         }, 100);
     });
 
-    // Displays toast notifications - similar to main script
-    function showToast(message, type = 'success') {
-        const bgClass = {
+    /* -------------------------------------------------
+       Toast
+    ------------------------------------------------- */
+    function showToast(msg, type = 'success') {
+        const bg = {
             success: 'bg-success',
             error: 'bg-danger',
-            info: 'bg-info',
             warning: 'bg-warning'
-        }[type] || 'bg-primary';
-        const toastHtml = `
-            <div class="toast align-items-center text-white ${bgClass} border-0 animate__animated animate__slideInRight" role="alert" aria-live="assertive" aria-atomic="true">
+        }[type] || 'bg-info';
+
+        const $toast = $(`
+            <div class="toast align-items-center text-white ${bg} border-0 neon-toast animate__animated animate__slideInRight">
                 <div class="d-flex">
-                    <div class="toast-body">${message}</div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    <div class="toast-body">${msg}</div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
                 </div>
-            </div>
-        `;
-        const toastElement = $(toastHtml).appendTo('.toast-container');
-        const toast = new bootstrap.Toast(toastElement[0], { delay: 5000 });
+            </div>`).appendTo('.toast-container');
+
+        const toast = new bootstrap.Toast($toast[0], { delay: 4000 });
         toast.show();
     }
 
-    // Initialize
+    /* -------------------------------------------------
+       Init
+    ------------------------------------------------- */
     loadSelectedData();
 });

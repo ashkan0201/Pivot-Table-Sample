@@ -46,7 +46,7 @@
         <div class="spinner"></div>
     </div>
     <div class="container">
-        <h1 class="mb-4 text-center animate__animated animate__fadeIn">Modern Pivot Table UI</h1>
+        <h1 class="mb-4 text-center animate__animated animate__fadeIn modern-title">Modern Pivot Table UI</h1>
         <p class="lead-text-center-animated-text">
             Select a CSV file to load data (up to 500K rows supported). Enjoy modern UI, dark/light mode, exports of pivoted data, charts with Plotly, and more!
         </p>
@@ -90,6 +90,12 @@
                 <i class="fas fa-file-upload"></i>
                 <p>Please upload a CSV file to start analyzing your data.</p>
             </div>
+        </div>
+        <div id="virtualTableContainer" class="pvtVirtualContainer d-none">
+            <table class="pvtVirtualHeader table table-sm">
+                <thead></thead>
+            </table>
+            <div class="pvtVirtualBody"></div>
         </div>
         <footer class="text-center mt-4">
             <p>Developed by Ashkan Norouzi &copy; 2025</p>
