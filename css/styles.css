@@ -1960,3 +1960,64 @@ body[data-bs-theme="dark"] #detailTable thead th:hover::before {
     }
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
+#detailOutput {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) rgba(0,0,0,0.2);
+}
+
+/* --- کانتینر اسکرول --- */
+.data-scroll-container {
+    max-height: 650px;
+    overflow: auto;
+    position: relative;
+    border: 2px solid var(--border-color) !important;
+    border-radius: 16px;
+    box-shadow: 0 0 30px rgba(0, 255, 198, 0.3);
+    margin-top: 1rem;
+}
+
+/* --- هدر sticky --- */
+#detailTable thead,
+#detailTable thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background: linear-gradient(135deg, #1e1e2f, #2a2a4a) !important;
+    color: var(--text-color) !important;
+    text-shadow: var(--text-shadow);
+    border-bottom: 3px solid var(--border-color) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+body[data-bs-theme="dark"] #detailTable thead,
+body[data-bs-theme="dark"] #detailTable thead th {
+    background: linear-gradient(135deg, #2a2a4a, #1e1e2f) !important;
+}
+
+/* --- حذف کامل scrollHead --- */
+.dataTables_scrollHead,
+.dataTables_scrollHeadInner,
+.dataTables_scrollHead table {
+    display: none !important;
+    height: 0 !important;
+    visibility: hidden !important;
+}
+
+--- اسکرول نرم ---
+.data-scroll-container::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+.data-scroll-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+.data-scroll-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 0 15px var(--border-color);
+}

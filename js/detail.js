@@ -1,4 +1,4 @@
-/* detail.js – Neon DataTable with Copy/CSV/Excel + XLSX Export */
+/* detail.js – Neon DataTable with Single Sticky Header */
 $(document).ready(function () {
     let selectedData = [];
     let dataTable = null;
@@ -64,7 +64,7 @@ $(document).ready(function () {
     }
 
     /* -------------------------------------------------
-       Render Neon DataTable
+       Render Neon DataTable – SINGLE HEADER
     ------------------------------------------------- */
     function renderDataTable() {
         $loader.show();
@@ -72,7 +72,13 @@ $(document).ready(function () {
 
         const headers = Object.keys(selectedData[0]);
         const columns = [
-            { title: '#', data: null, orderable: false, className: 'text-center neon-glow', width: '60px' }
+            { 
+                title: '#', 
+                data: null, 
+                orderable: false, 
+                className: 'text-center neon-glow', 
+                width: '60px' 
+            }
         ];
         headers.forEach(h => columns.push({
             title: h,
@@ -83,7 +89,7 @@ $(document).ready(function () {
 
         const $table = $('<table>', {
             id: 'detailTable',
-            class: 'table table-striped table-hover display responsive nowrap w-100 neon-table'
+            class: 'table table-striped table-hover display nowrap w-100 neon-table'
         });
 
         $('#detailOutput').append($table);
@@ -93,28 +99,44 @@ $(document).ready(function () {
             columns: columns,
             pageLength: 25,
             lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-            responsive: true,
-            dom: '<"neon-controls"B><"row"<"col-md-6"l><"col-md-6"f>>rtip',
-            buttons: [
+            responsive: false,
+            scrollX: true,
+            scrollY: '650px',
+            scrollCollapse: true,
+            autoWidth: false,
+            paging: true,
+            ordering: true,
+            info: true,
+            searching: true,
+            fixedHeader: false,
+            scroller: false,
+
+            columnDefs: [
                 {
-                    extend: 'copy',
-                    text: '<i class="fas fa-copy"></i>',
-                    titleAttr: 'Copy to clipboard',
-                    className: 'btn-neon btn-neon-copy'
+                    targets: '_all',
+                    className: 'text-truncate neon-cell',
+                    width: '150px',
+                    maxWidth: '200px',
+                    minWidth: '80px'
                 },
                 {
-                    extend: 'csv',
-                    text: '<i class="fas fa-file-csv"></i>',
-                    titleAttr: 'Export as CSV',
-                    className: 'btn-neon btn-neon-csv'
-                },
-                {
-                    extend: 'excel',
-                    text: '<i class="fas fa-file-excel"></i>',
-                    titleAttr: 'Export as Excel',
-                    className: 'btn-neon btn-neon-excel'
+                    targets: 0,
+                    orderable: false,
+                    width: '60px',
+                    className: 'text-center',
+                    render: (data, type, row, meta) => 
+                        `<span class="neon-number">${meta.row + meta.settings._iDisplayStart + 1}</span>`
                 }
             ],
+
+            dom: '<"neon-controls"B><"row"<"col-md-6"l><"col-md-6"f>>rtip',
+
+            buttons: [
+                { extend: 'copy', text: '<i class="fas fa-copy"></i>', className: 'btn-neon btn-neon-copy' },
+                { extend: 'csv', text: '<i class="fas fa-file-csv"></i>', className: 'btn-neon btn-neon-csv' },
+                { extend: 'excel', text: '<i class="fas fa-file-excel"></i>', className: 'btn-neon btn-neon-excel' }
+            ],
+
             order: [],
             language: {
                 search: "",
@@ -126,70 +148,45 @@ $(document).ready(function () {
                     previous: '<i class="fas fa-chevron-left"></i>'
                 }
             },
-            drawCallback: function () {
-                const api = this.api();
-                const start = api.page.info().start;
-                api.column(0, { page: 'current' }).nodes().each((cell, i) => {
-                    cell.innerHTML = `<span class="neon-number">${start + i + 1}</span>`;
+            initComplete: function () {
+                $('.dataTables_scrollHead').remove();
+                const $wrapper = $table.closest('.dataTables_wrapper');
+                $wrapper.find('.dataTables_scrollHead').remove();
+                const $scrollBody = $('.dataTables_scrollBody');
+                $scrollBody.css({
+                    'max-height': '650px',
+                    'overflow': 'auto',
+                    'position': 'relative',
+                    'border-top': 'none'
                 });
+                const $thead = $('#detailTable thead');
+                $thead.css({
+                    'position': 'sticky',
+                    'top': 0,
+                    'z-index': 10,
+                    'background': 'inherit'
+                });
+                $scrollBody.on('scroll', function () {
+                    const scrollLeft = $(this).scrollLeft();
+                    $thead.parent().scrollLeft(scrollLeft);
+                });
+                $('.dataTables_filter input').addClass('form-control neon-search');
+                $('.dataTables_length select').addClass('form-select neon-select');
+            },
+
+            drawCallback: function () {
+                $('.dataTables_scrollHead').remove();
             }
         });
-
-        // Neon style for search & length
-        $('.dataTables_filter input').addClass('form-control neon-search');
-        $('.dataTables_length select').addClass('form-select neon-select');
 
         $loader.hide();
     }
 
     /* -------------------------------------------------
-       Custom XLSX Export
-    ------------------------------------------------- */
-    $('#exportRawXlsx').on('click', function () {
-        $loader.show();
-        setTimeout(() => {
-            if (!selectedData.length) {
-                showToast('No data.', 'warning');
-                $loader.hide();
-                return;
-            }
-
-            try {
-                const headers = Object.keys(selectedData[0]);
-                const rows = selectedData.map(r => {
-                    const o = {};
-                    headers.forEach(h => o[h] = r[h] ?? '');
-                    return o;
-                });
-
-                const ws = XLSX.utils.json_to_sheet(rows);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'Data');
-
-                const colWidths = headers.map(h => ({
-                    wch: Math.max(h.length, ...rows.map(r => String(r[h] ?? '').length)) + 3
-                }));
-                ws['!cols'] = colWidths;
-
-                XLSX.writeFile(wb, 'selected_data.xlsx');
-                showToast('Exported to XLSX!', 'success');
-            } catch (e) {
-                showToast('Export failed.', 'error');
-            }
-            $loader.hide();
-        }, 100);
-    });
-
-    /* -------------------------------------------------
        Toast
     ------------------------------------------------- */
     function showToast(msg, type = 'success') {
-        const bg = {
-            success: 'bg-success',
-            error: 'bg-danger',
-            warning: 'bg-warning'
-        }[type] || 'bg-info';
-
+        const bg = { success: 'bg-success', error: 'bg-danger', warning: 'bg-warning' }[type] || 'bg-info';
         const $toast = $(`
             <div class="toast align-items-center text-white ${bg} border-0 neon-toast animate__animated animate__slideInRight">
                 <div class="d-flex">
@@ -198,8 +195,7 @@ $(document).ready(function () {
                 </div>
             </div>`).appendTo('.toast-container');
 
-        const toast = new bootstrap.Toast($toast[0], { delay: 4000 });
-        toast.show();
+        new bootstrap.Toast($toast[0], { delay: 4000 }).show();
     }
 
     /* -------------------------------------------------
