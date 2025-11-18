@@ -32,13 +32,13 @@
 |-----------|-----------|
 | ![Light](PivotImagesProject/l_main_mode.PNG) | ![Dark](PivotImagesProject/d_main_mode.PNG) |
 
-| Pivot + Chart | Cell Action Modal |
+| Pivot | Chart |
 |---------------|------------------|
-| ![Chart](screenshots/pivot-chart.png) | ![Modal](screenshots/cell-modal.png) |
+| ![Chart](PivotImagesProject/table_pivot.PNG) | ![Modal](PivotImagesProject/chart_pivot.PNG) |
 
 | Detail – Light | Detail – Dark |
 |----------------|----------------|
-| ![Detail Light](screenshots/detail-light.png) | ![Detail Dark](screenshots/detail-dark.png) |
+| ![Detail Light](PivotImagesProject/table_main_l.PNG) | ![Detail Dark](PivotImagesProject/table_main_d.PNG) |
 
 ---
 
@@ -59,7 +59,7 @@
 ├── detail.html         → Raw data drill-down view
 ├── css/                → Bootstrap + custom neon styles
 ├── js/                 → Pivot.js, Plotly, DataTables, XLSX, helpers
-└── screenshots/        → UI & dashboard preview images
+└── PivotImagesProject/        → UI & dashboard preview images
 ```
 
 ---
